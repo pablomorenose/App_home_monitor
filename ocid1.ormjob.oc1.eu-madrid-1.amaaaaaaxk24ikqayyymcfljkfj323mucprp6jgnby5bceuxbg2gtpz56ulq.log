@@ -1,0 +1,190 @@
+[2026/06/24 17:03:52] [INFO] - Getting providers from registry and/or custom terraform providers
+[2026/06/24 17:03:53] [INFO] - 
+[2026/06/24 17:03:53] [INFO] - Initializing provider plugins...
+[2026/06/24 17:03:53] [INFO] - - Finding latest version of hashicorp/oci...
+[2026/06/24 17:03:53] [INFO] - - Installing hashicorp/oci v8.20.0...
+[2026/06/24 17:03:55] [INFO] - - Installed hashicorp/oci v8.20.0 (unauthenticated)
+[2026/06/24 17:03:55] [INFO] - 
+[2026/06/24 17:03:55] [INFO] - Terraform has created a lock file .terraform.lock.hcl to record the provider
+[2026/06/24 17:03:55] [INFO] - selections it made above. Include this file in your version control repository
+[2026/06/24 17:03:55] [INFO] - so that Terraform can guarantee to make the same selections by default when
+[2026/06/24 17:03:55] [INFO] - you run "terraform init" in the future.
+[2026/06/24 17:03:55] [INFO] - 
+[2026/06/24 17:03:55] [INFO] - 
+[2026/06/24 17:03:55] [INFO] - Warning: Incomplete lock file information for providers
+[2026/06/24 17:03:55] [INFO] - 
+[2026/06/24 17:03:55] [INFO] - Due to your customized provider installation methods, Terraform was forced to
+[2026/06/24 17:03:55] [INFO] - calculate lock file checksums locally for the following providers:
+[2026/06/24 17:03:55] [INFO] -   - hashicorp/oci
+[2026/06/24 17:03:55] [INFO] - 
+[2026/06/24 17:03:55] [INFO] - The current .terraform.lock.hcl file only includes checksums for linux_arm64,
+[2026/06/24 17:03:55] [INFO] - so Terraform running on another platform will fail to install these
+[2026/06/24 17:03:55] [INFO] - providers.
+[2026/06/24 17:03:55] [INFO] - 
+[2026/06/24 17:03:55] [INFO] - To calculate additional checksums for another platform, run:
+[2026/06/24 17:03:55] [INFO] -   terraform providers lock -platform=linux_amd64
+[2026/06/24 17:03:55] [INFO] - (where linux_amd64 is the platform to generate)
+[2026/06/24 17:03:55] [INFO] - 
+[2026/06/24 17:03:55] [INFO] - Terraform has been successfully initialized!
+[2026/06/24 17:03:55] [INFO] - 
+[2026/06/24 17:03:55] [INFO] - You may now begin working with Terraform. Try running "terraform plan" to see
+[2026/06/24 17:03:55] [INFO] - any changes that are required for your infrastructure. All Terraform commands
+[2026/06/24 17:03:55] [INFO] - should now work.
+[2026/06/24 17:03:55] [INFO] - 
+[2026/06/24 17:03:55] [INFO] - If you ever set or change modules or backend configuration for Terraform,
+[2026/06/24 17:03:55] [INFO] - rerun this command to reinitialize your working directory. If you forget, other
+[2026/06/24 17:03:55] [INFO] - commands will detect it and remind you to do so if necessary.
+[2026/06/24 17:03:55] [INFO] - Loading Environment variables from var.env file...
+[2026/06/24 17:03:58] [INFO] - oci_core_vcn.generated_oci_core_vcn: Refreshing state... [id=ocid1.vcn.oc1.eu-madrid-1.amaaaaaaxk24ikqae26z3qwsgtpjlbmqsmsk26nzj7xkxoo7t4yoc63duopa]
+[2026/06/24 17:03:58] [INFO] - oci_core_internet_gateway.generated_oci_core_internet_gateway: Refreshing state... [id=ocid1.internetgateway.oc1.eu-madrid-1.aaaaaaaa72brcrosyhzeeqwbtmfbnicxm7sjfgazkwx5wg5jlpcoxgy5gdaa]
+[2026/06/24 17:03:58] [INFO] - oci_core_subnet.generated_oci_core_subnet: Refreshing state... [id=ocid1.subnet.oc1.eu-madrid-1.aaaaaaaac67giuvb44nhecmymiypxj2fmoceaixazq4uogk5rrjce5kwl2la]
+[2026/06/24 17:03:58] [INFO] - oci_core_default_route_table.generated_oci_core_default_route_table: Refreshing state... [id=ocid1.routetable.oc1.eu-madrid-1.aaaaaaaazknbhra7tybnhlp3fcqchawbunwiln6onjm7vbjthczfgrxrukma]
+[2026/06/24 17:03:58] [INFO] - 
+[2026/06/24 17:03:58] [INFO] - Terraform used the selected providers to generate the following execution
+[2026/06/24 17:03:58] [INFO] - plan. Resource actions are indicated with the following symbols:
+[2026/06/24 17:03:58] [INFO] -   + create
+[2026/06/24 17:03:58] [INFO] - 
+[2026/06/24 17:03:58] [INFO] - Terraform will perform the following actions:
+[2026/06/24 17:03:58] [INFO] - 
+[2026/06/24 17:03:58] [INFO] -   # oci_core_instance.generated_oci_core_instance will be created
+[2026/06/24 17:03:58] [INFO] -   + resource "oci_core_instance" "generated_oci_core_instance" {
+[2026/06/24 17:03:58] [INFO] -       + availability_domain                 = "HGYc:EU-MADRID-1-AD-1"
+[2026/06/24 17:03:58] [INFO] -       + boot_volume_id                      = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + capacity_reservation_id             = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + compartment_id                      = "ocid1.tenancy.oc1..aaaaaaaadf2zyv5owr73bkrkshehtezcynrkrfml5ercb3vubhxhnombpddq"
+[2026/06/24 17:03:58] [INFO] -       + compute_cluster_id                  = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + dedicated_vm_host_id                = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + defined_tags                        = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + display_name                        = "Home Monitor"
+[2026/06/24 17:03:58] [INFO] -       + extended_metadata                   = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + fault_domain                        = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + freeform_tags                       = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + hostname_label                      = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + id                                  = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + image                               = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + instance_configuration_id           = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + ipxe_script                         = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + is_ai_enterprise_enabled            = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + is_cross_numa_node                  = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + is_pv_encryption_in_transit_enabled = true
+[2026/06/24 17:03:58] [INFO] -       + launch_mode                         = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + metadata                            = {
+[2026/06/24 17:03:58] [INFO] -           + "ssh_authorized_keys" = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7jluz71565utl6H7LYOjy0ypaqGI5m3E+bhY4l0KVkHN3D/f0yT7dRlhW3BQAM0W4R34SvxaK28p3+NJQN3/4OrrBHSUqV/RogDyjTB0jzoDJE4py0nRV6tiASI7Xcnj0800OldkIychpTvThXC6qgTlcUkpWJBL9dCuBDaEjTMH+L7yYizs/mAj4GiqYkK/zoXbL2nxv8EVMhAZQcy0t7Az8MBA746RaZOWKn3OsjXREsI1fxcHoIvR6IoSjZXCulheenfoZzl87Vh5ti+bBcK52+IzLJWdIf8bw+B7IXs8KlUCwXMeIFGR3C0hgVYJuq7qIet6Tc7ub6Qs5SnzD ssh-key-2026-06-24"
+[2026/06/24 17:03:58] [INFO] -         }
+[2026/06/24 17:03:58] [INFO] -       + private_ip                          = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + public_ip                           = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + region                              = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + security_attributes                 = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + security_attributes_state           = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + shape                               = "VM.Standard.E2.1.Micro"
+[2026/06/24 17:03:58] [INFO] -       + state                               = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + subnet_id                           = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + system_tags                         = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + time_created                        = (known after apply)
+[2026/06/24 17:03:58] [INFO] -       + time_maintenance_reboot_due         = (known after apply)
+[2026/06/24 17:03:58] [INFO] - 
+[2026/06/24 17:03:58] [INFO] -       + agent_config {
+[2026/06/24 17:03:58] [INFO] -           + are_all_plugins_disabled = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + is_management_disabled   = false
+[2026/06/24 17:03:58] [INFO] -           + is_monitoring_disabled   = false
+[2026/06/24 17:03:58] [INFO] - 
+[2026/06/24 17:03:58] [INFO] -           + plugins_config {
+[2026/06/24 17:03:58] [INFO] -               + desired_state = "DISABLED"
+[2026/06/24 17:03:58] [INFO] -               + name          = "Vulnerability Scanning"
+[2026/06/24 17:03:58] [INFO] -             }
+[2026/06/24 17:03:58] [INFO] -           + plugins_config {
+[2026/06/24 17:03:58] [INFO] -               + desired_state = "DISABLED"
+[2026/06/24 17:03:58] [INFO] -               + name          = "OS Management Hub Agent"
+[2026/06/24 17:03:58] [INFO] -             }
+[2026/06/24 17:03:58] [INFO] -           + plugins_config {
+[2026/06/24 17:03:58] [INFO] -               + desired_state = "DISABLED"
+[2026/06/24 17:03:58] [INFO] -               + name          = "Management Agent"
+[2026/06/24 17:03:58] [INFO] -             }
+[2026/06/24 17:03:58] [INFO] -           + plugins_config {
+[2026/06/24 17:03:58] [INFO] -               + desired_state = "ENABLED"
+[2026/06/24 17:03:58] [INFO] -               + name          = "Custom Logs Monitoring"
+[2026/06/24 17:03:58] [INFO] -             }
+[2026/06/24 17:03:58] [INFO] -           + plugins_config {
+[2026/06/24 17:03:58] [INFO] -               + desired_state = "DISABLED"
+[2026/06/24 17:03:58] [INFO] -               + name          = "Compute RDMA GPU Monitoring"
+[2026/06/24 17:03:58] [INFO] -             }
+[2026/06/24 17:03:58] [INFO] -           + plugins_config {
+[2026/06/24 17:03:58] [INFO] -               + desired_state = "ENABLED"
+[2026/06/24 17:03:58] [INFO] -               + name          = "Compute Instance Monitoring"
+[2026/06/24 17:03:58] [INFO] -             }
+[2026/06/24 17:03:58] [INFO] -           + plugins_config {
+[2026/06/24 17:03:58] [INFO] -               + desired_state = "DISABLED"
+[2026/06/24 17:03:58] [INFO] -               + name          = "Compute HPC RDMA Auto-Configuration"
+[2026/06/24 17:03:58] [INFO] -             }
+[2026/06/24 17:03:58] [INFO] -           + plugins_config {
+[2026/06/24 17:03:58] [INFO] -               + desired_state = "DISABLED"
+[2026/06/24 17:03:58] [INFO] -               + name          = "Compute HPC RDMA Authentication"
+[2026/06/24 17:03:58] [INFO] -             }
+[2026/06/24 17:03:58] [INFO] -           + plugins_config {
+[2026/06/24 17:03:58] [INFO] -               + desired_state = "ENABLED"
+[2026/06/24 17:03:58] [INFO] -               + name          = "Cloud Guard Workload Protection"
+[2026/06/24 17:03:58] [INFO] -             }
+[2026/06/24 17:03:58] [INFO] -           + plugins_config {
+[2026/06/24 17:03:58] [INFO] -               + desired_state = "DISABLED"
+[2026/06/24 17:03:58] [INFO] -               + name          = "Block Volume Management"
+[2026/06/24 17:03:58] [INFO] -             }
+[2026/06/24 17:03:58] [INFO] -           + plugins_config {
+[2026/06/24 17:03:58] [INFO] -               + desired_state = "DISABLED"
+[2026/06/24 17:03:58] [INFO] -               + name          = "Bastion"
+[2026/06/24 17:03:58] [INFO] -             }
+[2026/06/24 17:03:58] [INFO] -         }
+[2026/06/24 17:03:58] [INFO] - 
+[2026/06/24 17:03:58] [INFO] -       + availability_config {
+[2026/06/24 17:03:58] [INFO] -           + is_live_migration_preferred = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + recovery_action             = "RESTORE_INSTANCE"
+[2026/06/24 17:03:58] [INFO] -         }
+[2026/06/24 17:03:58] [INFO] - 
+[2026/06/24 17:03:58] [INFO] -       + create_vnic_details {
+[2026/06/24 17:03:58] [INFO] -           + assign_ipv6ip             = false
+[2026/06/24 17:03:58] [INFO] -           + assign_private_dns_record = true
+[2026/06/24 17:03:58] [INFO] -           + assign_public_ip          = "false"
+[2026/06/24 17:03:58] [INFO] -           + defined_tags              = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + display_name              = "Home_monitor_VCN"
+[2026/06/24 17:03:58] [INFO] -           + freeform_tags             = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + hostname_label            = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + nsg_ids                   = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + private_ip                = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + private_ip_id             = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + security_attributes       = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + skip_source_dest_check    = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + subnet_cidr               = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + subnet_id                 = "ocid1.subnet.oc1.eu-madrid-1.aaaaaaaac67giuvb44nhecmymiypxj2fmoceaixazq4uogk5rrjce5kwl2la"
+[2026/06/24 17:03:58] [INFO] -           + vlan_id                   = (known after apply)
+[2026/06/24 17:03:58] [INFO] -         }
+[2026/06/24 17:03:58] [INFO] - 
+[2026/06/24 17:03:58] [INFO] -       + instance_options {
+[2026/06/24 17:03:58] [INFO] -           + are_legacy_imds_endpoints_disabled = true
+[2026/06/24 17:03:58] [INFO] -         }
+[2026/06/24 17:03:58] [INFO] - 
+[2026/06/24 17:03:58] [INFO] -       + source_details {
+[2026/06/24 17:03:58] [INFO] -           + boot_volume_size_in_gbs = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + boot_volume_vpus_per_gb = (known after apply)
+[2026/06/24 17:03:58] [INFO] -           + source_id               = "ocid1.image.oc1.eu-madrid-1.aaaaaaaa3yrk55rmvir2gn3xwa7owlxkbnhji3ivxvhohyb6o35mpisaxobq"
+[2026/06/24 17:03:58] [INFO] -           + source_type             = "image"
+[2026/06/24 17:03:58] [INFO] -         }
+[2026/06/24 17:03:58] [INFO] -     }
+[2026/06/24 17:03:58] [INFO] - 
+[2026/06/24 17:03:58] [INFO] - Plan: 1 to add, 0 to change, 0 to destroy.
+[2026/06/24 17:04:01] [INFO] - oci_core_instance.generated_oci_core_instance: Creating...
+[2026/06/24 17:04:01] [INFO] - 
+[2026/06/24 17:04:01] [INFO] - Error: 500-InternalError, Out of host capacity.
+[2026/06/24 17:04:01] [INFO] - Suggestion: The service for this resource encountered an error. Please contact support for help with service: Core Instance
+[2026/06/24 17:04:01] [INFO] - Documentation: https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_instance
+[2026/06/24 17:04:01] [INFO] - API Reference: https://docs.oracle.com/iaas/api/#/en/iaas/20160918/Instance/LaunchInstance
+[2026/06/24 17:04:01] [INFO] - Request Target: POST https://iaas.eu-madrid-1.oraclecloud.com/20160918/instances
+[2026/06/24 17:04:01] [INFO] - Provider version: 8.20.0, released on 2026-06-24.
+[2026/06/24 17:04:01] [INFO] - Service: Core Instance
+[2026/06/24 17:04:01] [INFO] - Operation Name: LaunchInstance
+[2026/06/24 17:04:01] [INFO] - OPC request ID: ff85a321684179c549b1d18b6e4949ef/58D8F83EF9FCD22B000E3C6A4D4144EB/33E85A70BAA40BE8C9CAC73301C15F01
+[2026/06/24 17:04:01] [INFO] - 
+[2026/06/24 17:04:01] [INFO] - 
+[2026/06/24 17:04:01] [INFO] -   with oci_core_instance.generated_oci_core_instance,
+[2026/06/24 17:04:01] [INFO] -   on main.tf line 3, in resource "oci_core_instance" "generated_oci_core_instance":
+[2026/06/24 17:04:01] [INFO] -    3: resource "oci_core_instance" "generated_oci_core_instance" {
+[2026/06/24 17:04:01] [INFO] - 
+[2026/06/24 17:04:02] [INFO] - 

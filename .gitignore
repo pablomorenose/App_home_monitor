@@ -1,0 +1,20 @@
+# Secretos — nunca subir
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Base de datos local (ya no se usa, pero por si acaso)
+*.db
+
+# macOS
+.DS_Store

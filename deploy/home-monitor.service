@@ -1,0 +1,14 @@
+[Unit]
+Description=Home Monitor Dashboard (Flask backend)
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/home-monitor
+ExecStart=/home/pi/home-monitor/venv/bin/python3 app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
