@@ -11,10 +11,18 @@ __pycache__/
 dist/
 build/
 .venv/
+.venv_vapid/
 venv/
 
 # Base de datos local (ya no se usa, pero por si acaso)
 *.db
 
+# Claves SSH y logs de Oracle
+*.key
+*.log
+
 # macOS
 .DS_Store
+
+# Scripts temporales
+gen_vapid.py
