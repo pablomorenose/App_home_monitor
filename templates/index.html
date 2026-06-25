@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,205 +12,201 @@
 <meta name="apple-mobile-web-app-title" content="HomeM">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 <style>
+  /* ── Temas ── */
   :root {
-    --bg: #0b0e0d; --panel: #111513; --panel-border: #1f2723;
-    --text-primary: #e7ece9; --text-dim: #6f7d76;
-    --green: #3ddc84; --green-glow: rgba(61,220,132,0.35);
-    --red: #ff5c5c; --red-glow: rgba(255,92,92,0.35);
-    --amber: #ffb454; --blue: #5b9cf6;
-    --mono: "IBM Plex Mono","SF Mono",Consolas,monospace;
-    --sans: "Inter",-apple-system,sans-serif;
+    --bg:#0b0e0d;--panel:#111513;--panel-border:#1f2723;
+    --text-primary:#e7ece9;--text-dim:#6f7d76;
+    --green:#3ddc84;--green-glow:rgba(61,220,132,.35);
+    --red:#ff5c5c;--red-glow:rgba(255,92,92,.35);
+    --amber:#ffb454;--blue:#5b9cf6;
+    --mono:"IBM Plex Mono","SF Mono",Consolas,monospace;
+    --sans:"Inter",-apple-system,sans-serif;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg);
-    background-image: radial-gradient(circle at 15% 0%,rgba(61,220,132,0.05),transparent 40%),
-      repeating-linear-gradient(0deg,rgba(255,255,255,0.012) 0px,rgba(255,255,255,0.012) 1px,transparent 1px,transparent 3px);
-    color: var(--text-primary); font-family: var(--sans);
-    min-height: 100vh; padding: 32px 20px 60px;
+  [data-theme="light"] {
+    --bg:#f4f6f5;--panel:#ffffff;--panel-border:#dde3e0;
+    --text-primary:#1a1f1d;--text-dim:#7a8a82;
+    --green:#1a9e57;--green-glow:rgba(26,158,87,.2);
+    --red:#d63b3b;--red-glow:rgba(214,59,59,.2);
+    --amber:#b87d00;--blue:#2563eb;
   }
-  .wrap { max-width: 880px; margin: 0 auto; }
-  header {
-    display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid var(--panel-border); padding-bottom: 18px; margin-bottom: 28px;
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);
+    background-image:radial-gradient(circle at 15% 0%,rgba(61,220,132,.04),transparent 40%);
+    color:var(--text-primary);font-family:var(--sans);
+    min-height:100vh;padding:24px 16px 60px;
+    transition:background .3s,color .3s;
   }
-  .title-block .eyebrow {
-    font-family: var(--mono); font-size: 11px; letter-spacing: .18em;
-    text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px;
+  .wrap{max-width:860px;margin:0 auto;}
+
+  /* ── Header ── */
+  header{
+    display:flex;justify-content:space-between;align-items:center;
+    border-bottom:1px solid var(--panel-border);padding-bottom:14px;margin-bottom:20px;gap:8px;
   }
-  h1 { font-size: 22px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
-  .clock { font-family: var(--mono); font-size: 13px; color: var(--text-dim); }
+  .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--text-dim);margin-bottom:3px;}
+  h1{font-size:19px;font-weight:650;margin:0;}
+  .header-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  .clock{font-family:var(--mono);font-size:12px;color:var(--text-dim);}
+
+  /* ── Botones ── */
+  .btn{
+    background:none;border:1px solid var(--panel-border);border-radius:6px;
+    color:var(--text-dim);font-family:var(--mono);font-size:11px;
+    padding:4px 9px;cursor:pointer;
+    transition:border-color .2s,color .2s,background .2s;white-space:nowrap;
+    text-decoration:none;display:inline-flex;align-items:center;gap:4px;
+  }
+  .btn:hover{border-color:var(--green);color:var(--green);}
+  .btn.add{border-color:var(--blue);color:var(--blue);font-size:15px;padding:2px 9px;}
+  .btn.add:hover{background:rgba(91,156,246,.08);}
+  .btn.notif-on{border-color:var(--red);color:var(--red);background:rgba(255,92,92,.08);}
+  .btn.theme-btn{font-size:14px;padding:3px 8px;}
 </style>
 <style>
-  /* Botones cabecera */
-  .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-  .icon-btn {
-    background: none; border: 1px solid var(--panel-border); border-radius: 6px;
-    color: var(--text-dim); font-family: var(--mono); font-size: 11px;
-    padding: 5px 10px; cursor: pointer;
-    transition: border-color .2s, color .2s, background .2s; white-space: nowrap;
+  /* ── Summary ── */
+  .summary-bar{display:flex;gap:8px;margin-bottom:16px;font-family:var(--mono);font-size:11px;flex-wrap:wrap;}
+  .chip{padding:4px 10px;border-radius:4px;border:1px solid var(--panel-border);background:var(--panel);color:var(--text-dim);}
+  .chip.alert{border-color:rgba(255,92,92,.4);color:var(--red);background:rgba(255,92,92,.06);}
+
+  /* ── Device list ── */
+  .device-list{display:flex;flex-direction:column;gap:7px;}
+  .device-row{
+    background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;
+    transition:border-color .3s,opacity .2s,transform .2s;
+    user-select:none;-webkit-user-select:none;overflow:hidden;
   }
-  .icon-btn:hover { border-color: var(--green); color: var(--green); }
-  .icon-btn.active { border-color: var(--green); color: var(--green); background: rgba(61,220,132,.08); }
-  .icon-btn.inactive { border-color: var(--red); color: var(--red); background: rgba(255,92,92,.08); }
-  .icon-btn.add { border-color: var(--blue); color: var(--blue); font-size: 16px; padding: 3px 10px; }
-  .icon-btn.add:hover { background: rgba(91,156,246,.08); }
+  .device-row.is-down{border-color:rgba(255,92,92,.4);}
+  .device-row.dragging{opacity:.4;}
+  .device-row.drag-over{border-color:var(--green);transform:scale(1.01);}
 
-  /* Summary */
-  .summary-bar { display: flex; gap: 10px; margin-bottom: 28px; font-family: var(--mono); font-size: 12px; }
-  .summary-chip { padding: 6px 12px; border-radius: 4px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--text-dim); }
-  .summary-chip.alert { border-color: rgba(255,92,92,.4); color: var(--red); background: rgba(255,92,92,.06); }
-
-  /* Device list */
-  .device-list { display: flex; flex-direction: column; gap: 10px; }
-  .device-row {
-    background: var(--panel); border: 1px solid var(--panel-border); border-radius: 8px;
-    transition: border-color .3s, opacity .2s, transform .2s;
-    user-select: none; -webkit-user-select: none; overflow: hidden;
+  /* ── Device header (compacto) ── */
+  .device-header{
+    display:grid;grid-template-columns:18px 1fr auto 20px;
+    align-items:center;gap:10px;padding:10px 14px;
+    cursor:pointer;-webkit-tap-highlight-color:transparent;
   }
-  .device-row.is-down { border-color: rgba(255,92,92,.35); }
-  .device-row.dragging { opacity: .4; }
-  .device-row.drag-over { border-color: var(--green); transform: scale(1.01); }
+  .device-header:active{background:rgba(128,128,128,.04);}
+  .led{width:10px;height:10px;border-radius:50%;background:var(--text-dim);margin:0 auto;flex-shrink:0;}
+  .led.on{background:var(--green);box-shadow:0 0 7px 2px var(--green-glow);}
+  .led.off{background:var(--red);box-shadow:0 0 7px 2px var(--red-glow);animation:pulse 1.6s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .device-name-row{display:flex;align-items:baseline;gap:8px;min-width:0;}
+  .device-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .status-inline{font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;flex-shrink:0;}
+  .status-inline.up{color:var(--green);}
+  .status-inline.down{color:var(--red);}
+  .collapse-btn{color:var(--text-dim);font-size:12px;display:flex;align-items:center;justify-content:center;transition:transform .25s;}
+  .device-row.collapsed .collapse-btn{transform:rotate(-90deg);}
+  .drag-handle{color:var(--text-dim);font-size:14px;cursor:grab;touch-action:none;display:flex;align-items:center;justify-content:center;border-radius:4px;}
+  .drag-handle:active{cursor:grabbing;color:var(--green);}
 
-  /* Device header */
-  .device-header {
-    display: grid; grid-template-columns: 24px 1fr auto 24px;
-    align-items: center; gap: 12px; padding: 14px 18px;
-    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  /* ── Device body ── */
+  .device-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .25s;overflow:hidden;}
+  .device-row.collapsed .device-body{grid-template-rows:0fr;}
+  .device-body-inner{min-height:0;padding:0 14px;transition:padding .25s;}
+  .device-row.collapsed .device-body-inner{padding-top:0;padding-bottom:0;}
+  .device-body-content{
+    border-top:1px solid var(--panel-border);padding:8px 0 6px;
+    display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;
   }
-  .device-header:active { background: rgba(255,255,255,.03); }
-  .device-name { font-size: 15px; font-weight: 600; }
-  .collapse-btn { color: var(--text-dim); font-size: 13px; display: flex; align-items: center; justify-content: center; transition: transform .25s; }
-  .device-row.collapsed .collapse-btn { transform: rotate(-90deg); }
-  .drag-handle { color: var(--text-dim); font-size: 16px; cursor: grab; touch-action: none; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 4px; }
-  .drag-handle:active { cursor: grabbing; color: var(--green); }
+  .device-left{display:flex;flex-direction:column;gap:3px;}
+  .device-meta{font-family:var(--mono);font-size:10px;color:var(--text-dim);}
+  .since-row{font-family:var(--mono);font-size:10px;color:var(--text-dim);}
+  .error-text{color:var(--amber);}
+  .device-right{text-align:right;font-family:var(--mono);font-size:10px;color:var(--text-dim);flex-shrink:0;}
+  .latency{font-size:11px;font-weight:600;}
+  .latency.fast{color:var(--green);}
+  .latency.slow{color:var(--amber);}
+  .latency.vslow{color:var(--red);}
 
-  /* LED */
-  .led { width: 12px; height: 12px; border-radius: 50%; background: var(--text-dim); margin: 0 auto; }
-  .led.on { background: var(--green); box-shadow: 0 0 8px 2px var(--green-glow); }
-  .led.off { background: var(--red); box-shadow: 0 0 8px 2px var(--red-glow); animation: pulse 1.6s ease-in-out infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+  /* ── Sparkline ── */
+  .sparkline-wrap{margin-top:4px;}
+  .sparkline svg{display:block;}
+
+  /* ── Uptime bar ── */
+  .uptime-row{display:flex;align-items:center;gap:8px;margin-top:6px;margin-bottom:8px;}
+  .uptime-bar{flex:1;height:5px;border-radius:3px;overflow:hidden;display:flex;background:var(--panel-border);}
+  .uptime-seg{height:100%;}
+  .uptime-seg.on{background:var(--green);}
+  .uptime-seg.off{background:var(--red);}
+  .uptime-pct{font-family:var(--mono);font-size:10px;flex-shrink:0;width:36px;text-align:right;}
+
+  /* ── Device actions ── */
+  .device-actions{display:flex;gap:6px;padding:4px 0 10px;}
+  .btn-xs{
+    font-family:var(--mono);font-size:10px;padding:3px 8px;
+    border-radius:4px;border:1px solid var(--panel-border);
+    background:none;color:var(--text-dim);cursor:pointer;
+    transition:border-color .2s,color .2s;
+  }
+  .btn-xs.edit:hover{border-color:var(--blue);color:var(--blue);}
+  .btn-xs.del:hover{border-color:var(--red);color:var(--red);}
+
+  footer{margin-top:28px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text-dim);}
+
+  @media(max-width:520px){
+    header{gap:6px;}
+    .clock{display:none;}
+    .device-header{grid-template-columns:16px 1fr auto 18px;gap:8px;padding:9px 12px;}
+  }
+  @media(prefers-reduced-motion:reduce){.led.off{animation:none;}}
 </style>
 <style>
-  /* Device body (collapsible) */
-  .device-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .25s; overflow: hidden; }
-  .device-row.collapsed .device-body { grid-template-rows: 0fr; }
-  .device-body-inner { min-height: 0; padding: 0 18px; transition: padding .25s; }
-  .device-row.collapsed .device-body-inner { padding-top: 0; padding-bottom: 0; }
-  .device-body-content {
-    display: flex; justify-content: space-between; align-items: flex-start;
-    padding: 12px 0 14px; border-top: 1px solid var(--panel-border); gap: 16px;
+  /* ── Modal ── */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);
+    z-index:100;align-items:center;justify-content:center;padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:#131816;border:1px solid var(--panel-border);border-radius:12px;
+    padding:22px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;}
+  .modal h2{margin:0 0 18px;font-size:15px;font-weight:600;}
+  .fg{margin-bottom:13px;}
+  .fg label{display:block;font-family:var(--mono);font-size:10px;color:var(--text-dim);
+    margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em;}
+  .fg input,.fg select{
+    width:100%;background:var(--panel);border:1px solid var(--panel-border);
+    border-radius:6px;color:var(--text-primary);font-family:var(--mono);
+    font-size:13px;padding:7px 11px;outline:none;transition:border-color .2s;
   }
-  .device-meta { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
-  .device-status { text-align: right; font-family: var(--mono); font-size: 12px; flex-shrink: 0; }
-  .status-label { font-weight: 600; letter-spacing: .04em; text-transform: uppercase; font-size: 11px; }
-  .status-label.up { color: var(--green); }
-  .status-label.down { color: var(--red); }
-  .since { color: var(--text-dim); margin-top: 3px; }
-
-  /* Latencia */
-  .latency { font-size: 11px; margin-top: 4px; }
-  .latency.fast { color: var(--green); }
-  .latency.slow { color: var(--amber); }
-  .latency.very-slow { color: var(--red); }
-
-  /* Botones editar/borrar */
-  .device-actions { display: flex; gap: 8px; margin-top: 10px; padding-bottom: 14px; }
-  .btn-sm {
-    font-family: var(--mono); font-size: 10px; padding: 4px 10px;
-    border-radius: 4px; border: 1px solid var(--panel-border);
-    background: none; color: var(--text-dim); cursor: pointer;
-    transition: border-color .2s, color .2s;
-  }
-  .btn-sm.edit:hover { border-color: var(--blue); color: var(--blue); }
-  .btn-sm.del:hover { border-color: var(--red); color: var(--red); }
-
-  .error-text { color: var(--amber); }
-  footer { margin-top: 32px; text-align: center; font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
-
-  @media (max-width: 520px) {
-    header { flex-direction: row; align-items: center; gap: 8px; }
-    .clock { display: none; }
-    .device-header { grid-template-columns: 20px 1fr auto 20px; gap: 8px; }
-  }
-  @media (prefers-reduced-motion: reduce) { .led.off { animation: none; } }
-</style>
-<style>
-  /* Modal */
-  .modal-overlay {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
-    z-index: 100; align-items: center; justify-content: center; padding: 20px;
-  }
-  .modal-overlay.open { display: flex; }
-  .modal {
-    background: #161a18; border: 1px solid var(--panel-border); border-radius: 12px;
-    padding: 24px; width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto;
-  }
-  .modal h2 { margin: 0 0 20px; font-size: 16px; font-weight: 600; }
-  .form-group { margin-bottom: 16px; }
-  .form-group label { display: block; font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .08em; }
-  .form-group input, .form-group select {
-    width: 100%; background: var(--panel); border: 1px solid var(--panel-border);
-    border-radius: 6px; color: var(--text-primary); font-family: var(--mono);
-    font-size: 13px; padding: 8px 12px; outline: none;
-    transition: border-color .2s;
-  }
-  .form-group input:focus, .form-group select:focus { border-color: var(--green); }
-  .form-group select option { background: #161a18; }
-  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
-  .btn-primary {
-    flex: 1; background: var(--green); color: #0b0e0d; border: none;
-    border-radius: 6px; font-family: var(--mono); font-size: 12px;
-    font-weight: 700; padding: 10px; cursor: pointer; transition: opacity .2s;
-  }
-  .btn-primary:hover { opacity: .85; }
-  .btn-cancel {
-    flex: 1; background: none; border: 1px solid var(--panel-border);
-    border-radius: 6px; color: var(--text-dim); font-family: var(--mono);
-    font-size: 12px; padding: 10px; cursor: pointer; transition: border-color .2s;
-  }
-  .btn-cancel:hover { border-color: var(--red); color: var(--red); }
+  .fg input:focus,.fg select:focus{border-color:var(--green);}
+  .fg select option{background:#131816;}
+  .modal-actions{display:flex;gap:8px;margin-top:18px;}
+  .btn-save{flex:1;background:var(--green);color:#0b0e0d;border:none;border-radius:6px;
+    font-family:var(--mono);font-size:12px;font-weight:700;padding:10px;cursor:pointer;transition:opacity .2s;}
+  .btn-save:hover{opacity:.85;}
+  .btn-cancel2{flex:1;background:none;border:1px solid var(--panel-border);border-radius:6px;
+    color:var(--text-dim);font-family:var(--mono);font-size:12px;padding:10px;cursor:pointer;transition:border-color .2s,color .2s;}
+  .btn-cancel2:hover{border-color:var(--red);color:var(--red);}
 </style>
 </head>
 <body>
 <div class="wrap">
-
   <header>
-    <div class="title-block">
+    <div>
       <div class="eyebrow">Infraestructura doméstica</div>
       <h1>Panel de estado</h1>
     </div>
     <div class="header-actions">
-      <div class="clock" id="clock">--:--:--</div>
-      <button class="icon-btn add" onclick="openModal()">＋</button>
-      <button class="icon-btn" id="notif-btn" onclick="toggleNotifications()">🔔 Alertas</button>
+      <span class="clock" id="clock">--:--:--</span>
+      <button class="btn theme-btn" id="theme-btn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+      <a href="/historial" class="btn" title="Historial">📋</a>
+      <button class="btn add" onclick="openModal()" title="Añadir dispositivo">＋</button>
+      <button class="btn" id="notif-btn" onclick="toggleNotifications()">🔔</button>
     </div>
   </header>
-
-  <div class="summary-bar" id="summary-bar">
-    <div class="summary-chip">Cargando…</div>
-  </div>
-
+  <div class="summary-bar" id="summary-bar"><div class="chip">Cargando…</div></div>
   <div class="device-list" id="device-list"></div>
-
   <footer id="footer-note">Comprobando conexión…</footer>
-
 </div>
 
-<!-- Modal añadir/editar dispositivo -->
+<!-- Modal -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModalOnBg(event)">
   <div class="modal">
     <h2 id="modal-title">Añadir dispositivo</h2>
-
-    <div class="form-group">
-      <label>Nombre</label>
-      <input type="text" id="f-name" placeholder="Ej: Router Casa">
-    </div>
-    <div class="form-group">
-      <label>ID único</label>
-      <input type="text" id="f-id" placeholder="Ej: router_casa (sin espacios)">
-    </div>
-    <div class="form-group">
+    <div class="fg"><label>Nombre</label><input type="text" id="f-name" placeholder="Ej: Router Casa"></div>
+    <div class="fg"><label>ID único</label><input type="text" id="f-id" placeholder="router_casa"></div>
+    <div class="fg">
       <label>Tipo</label>
       <select id="f-type" onchange="updateFields()">
         <option value="http">HTTP — URL accesible</option>
@@ -219,353 +215,277 @@
         <option value="ha_entity">Entidad Home Assistant</option>
       </select>
     </div>
-
-    <!-- Campos dinámicos según tipo -->
-    <div id="fields-http">
-      <div class="form-group">
-        <label>URL</label>
-        <input type="text" id="f-url" placeholder="https://...">
-      </div>
-    </div>
-    <div id="fields-ping" style="display:none">
-      <div class="form-group">
-        <label>Host / IP</label>
-        <input type="text" id="f-host-ping" placeholder="192.168.1.1">
-      </div>
-    </div>
+    <div id="fields-http"><div class="fg"><label>URL</label><input type="text" id="f-url" placeholder="https://..."></div></div>
+    <div id="fields-ping" style="display:none"><div class="fg"><label>Host / IP</label><input type="text" id="f-host-ping" placeholder="192.168.1.1"></div></div>
     <div id="fields-port" style="display:none">
-      <div class="form-group">
-        <label>Host / IP</label>
-        <input type="text" id="f-host-port" placeholder="192.168.1.1">
-      </div>
-      <div class="form-group">
-        <label>Puerto</label>
-        <input type="number" id="f-port" placeholder="22">
-      </div>
+      <div class="fg"><label>Host / IP</label><input type="text" id="f-host-port" placeholder="192.168.1.1"></div>
+      <div class="fg"><label>Puerto</label><input type="number" id="f-port" placeholder="22"></div>
     </div>
-    <div id="fields-ha" style="display:none">
-      <div class="form-group">
-        <label>Entity ID de Home Assistant</label>
-        <input type="text" id="f-entity" placeholder="camera.sonoff1">
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label>Timeout (segundos)</label>
-      <input type="number" id="f-timeout" value="8" min="1" max="30">
-    </div>
-
+    <div id="fields-ha" style="display:none"><div class="fg"><label>Entity ID de Home Assistant</label><input type="text" id="f-entity" placeholder="camera.sonoff1"></div></div>
+    <div class="fg"><label>Timeout (segundos)</label><input type="number" id="f-timeout" value="8" min="1" max="30"></div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary" onclick="saveDevice()">Guardar</button>
+      <button class="btn-cancel2" onclick="closeModal()">Cancelar</button>
+      <button class="btn-save" onclick="saveDevice()">Guardar</button>
     </div>
   </div>
 </div>
 
 <script>
-const REFRESH_MS = 5000;
-const ORDER_KEY = 'homem_order';
-const COLLAPSED_KEY = 'homem_collapsed';
-let editingId = null;
+const REFRESH_MS=5000,ORDER_KEY='homem_order',COLLAPSED_KEY='homem_collapsed';
+let editingId=null;
 
-// --- Reloj ---
-function updateClock() {
-  document.getElementById('clock').textContent = new Date().toLocaleTimeString('es-ES');
-}
-setInterval(updateClock, 1000); updateClock();
+// Reloj
+function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES');}
+setInterval(updateClock,1000);updateClock();
 
-// --- Orden ---
-function loadOrder() { try { return JSON.parse(localStorage.getItem(ORDER_KEY)) || []; } catch { return []; } }
-function saveOrder(ids) { localStorage.setItem(ORDER_KEY, JSON.stringify(ids)); }
-function applyOrder(devices) {
-  const order = loadOrder();
-  if (!order.length) return devices;
-  return [...devices].sort((a,b) => {
-    const ia = order.indexOf(a.id), ib = order.indexOf(b.id);
-    if (ia===-1&&ib===-1) return 0; if (ia===-1) return 1; if (ib===-1) return -1;
-    return ia - ib;
-  });
+// Tema
+function applyTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('homem_theme',t);document.getElementById('theme-btn').textContent=t==='dark'?'🌙':'☀️';}
+function toggleTheme(){applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');}
+applyTheme(localStorage.getItem('homem_theme')||'dark');
+
+// Orden
+function loadOrder(){try{return JSON.parse(localStorage.getItem(ORDER_KEY))||[];}catch{return[];}}
+function saveOrder(ids){localStorage.setItem(ORDER_KEY,JSON.stringify(ids));}
+function applyOrder(devices){
+  const o=loadOrder();if(!o.length)return devices;
+  return[...devices].sort((a,b)=>{const ia=o.indexOf(a.id),ib=o.indexOf(b.id);if(ia===-1&&ib===-1)return 0;if(ia===-1)return 1;if(ib===-1)return-1;return ia-ib;});
 }
 
-// --- Colapsado ---
-function loadCollapsed() { try { return JSON.parse(localStorage.getItem(COLLAPSED_KEY)) || {}; } catch { return {}; } }
-function saveCollapsed(map) { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(map)); }
-function toggleCollapsed(id) {
-  const map = loadCollapsed(); map[id] = !map[id]; saveCollapsed(map);
-  const row = document.querySelector(`.device-row[data-id="${id}"]`);
-  if (row) row.classList.toggle('collapsed', map[id]);
+// Colapsado
+function loadCollapsed(){try{return JSON.parse(localStorage.getItem(COLLAPSED_KEY))||{};}catch{return{};}}
+function saveCollapsed(m){localStorage.setItem(COLLAPSED_KEY,JSON.stringify(m));}
+function toggleCollapsed(id){
+  const m=loadCollapsed();m[id]=!m[id];saveCollapsed(m);
+  const r=document.querySelector(`.device-row[data-id="${id}"]`);
+  if(r)r.classList.toggle('collapsed',m[id]);
 }
 
-// --- Latencia ---
-function latencyHtml(ms) {
-  if (ms == null) return '';
-  let cls = 'fast', label = ms + 'ms';
-  if (ms > 2000) { cls = 'very-slow'; label = (ms/1000).toFixed(1)+'s'; }
-  else if (ms > 500) { cls = 'slow'; label = ms + 'ms'; }
-  return `<div class="latency ${cls}">${label}</div>`;
+// Latencia
+function latencyHtml(ms){
+  if(ms==null)return'';
+  let cls='fast',lbl=ms+'ms';
+  if(ms>2000){cls='vslow';lbl=(ms/1000).toFixed(1)+'s';}
+  else if(ms>500){cls='slow';}
+  return`<div class="latency ${cls}">${lbl}</div>`;
 }
 
-// --- Summary ---
-function renderSummary(devices) {
-  const bar = document.getElementById('summary-bar');
-  const total = devices.length, down = devices.filter(d=>!d.online).length;
-  if (!down) { bar.innerHTML=`<div class="summary-chip">${total} dispositivos · todo operativo</div>`; }
-  else { bar.innerHTML=`<div class="summary-chip alert">${down} de ${total} caído${down>1?'s':''}</div><div class="summary-chip">${total-down} operativos</div>`; }
+// Sparkline SVG (mini gráfica de línea)
+const sparkCache={};
+function sparklineHtml(id){
+  const pts=sparkCache[id];
+  if(!pts||pts.length<2)return'';
+  const W=60,H=18,max=Math.max(...pts,1),min=Math.min(...pts,0);
+  const range=max-min||1;
+  const coords=pts.map((v,i)=>`${(i/(pts.length-1)*W).toFixed(1)},${(H-(v-min)/range*H).toFixed(1)}`).join(' ');
+  return`<div class="sparkline-wrap"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline points="${coords}" fill="none" stroke="var(--blue)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg></div>`;
 }
 
-// --- Render dispositivos ---
-function renderDevices(devices) {
-  const ordered = applyOrder(devices);
-  const collapsed = loadCollapsed();
-  const list = document.getElementById('device-list');
-  list.innerHTML = ordered.map(d => {
-    const ledClass = d.online ? 'on' : 'off';
-    const rowClass = (d.online ? '' : 'is-down') + (collapsed[d.id] ? ' collapsed' : '');
-    const statusLabel = d.online ? 'Conectado' : 'Desconectado';
-    const statusClass = d.online ? 'up' : 'down';
-    const sinceLabel = d.online ? `Estable ${d.since_human}` : `Caído ${d.since_human}`;
-    const errHtml = d.last_error ? ` · <span class="error-text">${d.last_error}</span>` : '';
-    return `
-      <div class="device-row ${rowClass}" draggable="true" data-id="${d.id}">
-        <div class="device-header">
-          <div class="led ${ledClass}"></div>
-          <div class="device-name">${d.name}</div>
-          <div class="collapse-btn">▾</div>
-          <div class="drag-handle">⠿</div>
+// Summary
+function renderSummary(devices){
+  const bar=document.getElementById('summary-bar');
+  const total=devices.length,down=devices.filter(d=>!d.online).length;
+  bar.innerHTML=!down?`<div class="chip">${total} dispositivos · todo operativo</div>`
+    :`<div class="chip alert">${down} de ${total} caído${down>1?'s':''}</div><div class="chip">${total-down} operativos</div>`;
+}
+
+// Render
+function renderDevices(devices){
+  const ordered=applyOrder(devices),collapsed=loadCollapsed();
+  const list=document.getElementById('device-list');
+  list.innerHTML=ordered.map(d=>{
+    const lc=d.online?'on':'off';
+    const rc=(d.online?'':'is-down')+(collapsed[d.id]?' collapsed':'');
+    const sc=d.online?'up':'down';
+    const sl=d.online?'Online':'Offline';
+    const since=d.online?`Estable ${d.since_human}`:`Caído ${d.since_human}`;
+    const err=d.last_error?`<span class="error-text"> · ${d.last_error}</span>`:'';
+    return`<div class="device-row ${rc}" draggable="true" data-id="${d.id}">
+      <div class="device-header">
+        <div class="led ${lc}"></div>
+        <div class="device-name-row">
+          <span class="device-name">${d.name}</span>
+          <span class="status-inline ${sc}">${sl}</span>
         </div>
-        <div class="device-body"><div class="device-body-inner">
-          <div class="device-body-content">
-            <div class="device-meta">${d.id}${errHtml}</div>
-            <div class="device-status">
-              <div class="status-label ${statusClass}">${statusLabel}</div>
-              <div class="since">${sinceLabel}</div>
-              ${latencyHtml(d.response_ms)}
-            </div>
+        <div class="collapse-btn">▾</div>
+        <div class="drag-handle">⠿</div>
+      </div>
+      <div class="device-body"><div class="device-body-inner">
+        <div class="device-body-content">
+          <div class="device-left">
+            <div class="device-meta">${d.id}${err}</div>
+            <div class="since-row">${since}</div>
+            ${sparklineHtml(d.id)}
           </div>
-          <div class="device-actions">
-            <button class="btn-sm edit" onclick="editDevice('${d.id}')">✏️ Editar</button>
-            <button class="btn-sm del" onclick="confirmDelete('${d.id}','${d.name}')">🗑 Borrar</button>
+          <div class="device-right">
+            ${latencyHtml(d.response_ms)}
+            <div id="uptime-pct-${d.id}" style="margin-top:3px">…</div>
           </div>
-        </div></div>
-      </div>`;
+        </div>
+        <div class="uptime-row">
+          <div class="uptime-bar" id="uptime-bar-${d.id}"></div>
+          <div class="uptime-pct" id="uptime-pct2-${d.id}"></div>
+        </div>
+        <div class="device-actions">
+          <button class="btn-xs edit" onclick="editDevice('${d.id}')">✏️ Editar</button>
+          <button class="btn-xs del" onclick="confirmDelete('${d.id}','${d.name}')">🗑 Borrar</button>
+        </div>
+      </div></div>
+    </div>`;
   }).join('');
   initInteractions();
+  ordered.forEach(d=>{loadUptime(d.id);loadLatency(d.id);});
+}
+
+async function loadUptime(id){
+  try{
+    const data=await(await fetch(`/api/uptime/${id}`)).json();
+    const pct=data.uptime_pct;
+    const col=pct>=99?'var(--green)':pct>=90?'var(--amber)':'var(--red)';
+    const el=document.getElementById(`uptime-pct-${id}`);
+    const el2=document.getElementById(`uptime-pct2-${id}`);
+    const bar=document.getElementById(`uptime-bar-${id}`);
+    if(el)el.textContent='';
+    if(el2){el2.textContent=pct+'%';el2.style.color=col;}
+    if(bar)bar.innerHTML=data.segments.map(s=>`<div class="uptime-seg ${s.online?'on':'off'}" style="width:${Math.max(.2,s.pct).toFixed(2)}%"></div>`).join('');
+  }catch{}
+}
+
+async function loadLatency(id){
+  try{
+    const data=await(await fetch(`/api/latency/${id}`)).json();
+    if(data.points&&data.points.length){
+      sparkCache[id]=data.points.map(p=>p.ms);
+      // Actualizar sparkline sin re-render completo
+      const row=document.querySelector(`.device-row[data-id="${id}"] .sparkline-wrap`);
+      if(row)row.outerHTML=sparklineHtml(id);
+    }
+  }catch{}
 }
 </script>
 
 <script>
-// --- Modal ---
-function updateFields() {
-  const type = document.getElementById('f-type').value;
-  document.getElementById('fields-http').style.display  = type==='http'      ? '' : 'none';
-  document.getElementById('fields-ping').style.display  = type==='ping'      ? '' : 'none';
-  document.getElementById('fields-port').style.display  = type==='port'      ? '' : 'none';
-  document.getElementById('fields-ha').style.display    = type==='ha_entity' ? '' : 'none';
+// Modal
+function updateFields(){
+  const t=document.getElementById('f-type').value;
+  ['http','ping','port','ha'].forEach(k=>document.getElementById('fields-'+k).style.display=t===(k==='ha'?'ha_entity':k)?'':'none');
 }
-
-function openModal(device) {
-  editingId = device ? device.id : null;
-  document.getElementById('modal-title').textContent = device ? 'Editar dispositivo' : 'Añadir dispositivo';
-  document.getElementById('f-name').value    = device?.name    || '';
-  document.getElementById('f-id').value      = device?.id      || '';
-  document.getElementById('f-id').disabled   = !!device;
-  document.getElementById('f-type').value    = device?.type    || 'http';
-  document.getElementById('f-url').value     = device?.url     || '';
-  document.getElementById('f-host-ping').value = device?.host  || '';
-  document.getElementById('f-host-port').value = device?.host  || '';
-  document.getElementById('f-port').value    = device?.port    || '';
-  document.getElementById('f-entity').value  = device?.entity_id || '';
-  document.getElementById('f-timeout').value = device?.timeout || 8;
+function openModal(device){
+  editingId=device?device.id:null;
+  document.getElementById('modal-title').textContent=device?'Editar dispositivo':'Añadir dispositivo';
+  document.getElementById('f-name').value=device?.name||'';
+  document.getElementById('f-id').value=device?.id||'';
+  document.getElementById('f-id').disabled=!!device;
+  document.getElementById('f-type').value=device?.type||'http';
+  document.getElementById('f-url').value=device?.url||'';
+  document.getElementById('f-host-ping').value=device?.host||'';
+  document.getElementById('f-host-port').value=device?.host||'';
+  document.getElementById('f-port').value=device?.port||'';
+  document.getElementById('f-entity').value=device?.entity_id||'';
+  document.getElementById('f-timeout').value=device?.timeout||8;
   updateFields();
   document.getElementById('modal-overlay').classList.add('open');
 }
-
-function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
-function closeModalOnBg(e) { if (e.target.id === 'modal-overlay') closeModal(); }
-
-async function saveDevice() {
-  const type    = document.getElementById('f-type').value;
-  const name    = document.getElementById('f-name').value.trim();
-  const id      = editingId || document.getElementById('f-id').value.trim().replace(/\s+/g,'_');
-  const timeout = parseInt(document.getElementById('f-timeout').value) || 8;
-  if (!name || !id) { alert('Nombre e ID son obligatorios'); return; }
-
-  const device = { id, name, type, timeout };
-  if (type === 'http')      device.url       = document.getElementById('f-url').value.trim();
-  if (type === 'ping')      device.host      = document.getElementById('f-host-ping').value.trim();
-  if (type === 'port')    { device.host      = document.getElementById('f-host-port').value.trim();
-                            device.port      = parseInt(document.getElementById('f-port').value); }
-  if (type === 'ha_entity') device.entity_id = document.getElementById('f-entity').value.trim();
-
-  const method = editingId ? 'PUT' : 'POST';
-  const url    = editingId ? `/api/devices/${editingId}` : '/api/devices';
-  await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(device) });
-  closeModal();
-  refresh();
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
+function closeModalOnBg(e){if(e.target.id==='modal-overlay')closeModal();}
+async function saveDevice(){
+  const type=document.getElementById('f-type').value;
+  const name=document.getElementById('f-name').value.trim();
+  const id=editingId||document.getElementById('f-id').value.trim().replace(/\s+/g,'_');
+  const timeout=parseInt(document.getElementById('f-timeout').value)||8;
+  if(!name||!id){alert('Nombre e ID son obligatorios');return;}
+  const device={id,name,type,timeout};
+  if(type==='http')device.url=document.getElementById('f-url').value.trim();
+  if(type==='ping')device.host=document.getElementById('f-host-ping').value.trim();
+  if(type==='port'){device.host=document.getElementById('f-host-port').value.trim();device.port=parseInt(document.getElementById('f-port').value);}
+  if(type==='ha_entity')device.entity_id=document.getElementById('f-entity').value.trim();
+  await fetch(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(device)});
+  closeModal();refresh();
+}
+async function editDevice(id){
+  const devs=await(await fetch('/api/devices')).json();
+  const d=devs.find(x=>x.id===id);if(d)openModal(d);
+}
+async function confirmDelete(id,name){
+  if(!confirm(`¿Borrar "${name}"? Se eliminará también su historial.`))return;
+  await fetch(`/api/devices/${id}`,{method:'DELETE'});refresh();
 }
 
-let deviceConfigs = {};
-
-async function editDevice(id) {
-  const res = await fetch('/api/devices');
-  const devs = await res.json();
-  const d = devs.find(x => x.id === id);
-  if (d) openModal(d);
-}
-
-async function confirmDelete(id, name) {
-  if (!confirm(`¿Borrar "${name}"? Se eliminará también su historial.`)) return;
-  await fetch(`/api/devices/${id}`, { method: 'DELETE' });
-  refresh();
-}
-</script>
-
-<script>
-// --- Drag & Drop ---
-function initInteractions() {
-  const list = document.getElementById('device-list');
-  const rows = [...list.querySelectorAll('.device-row')];
-  let dragged = null;
-
-  rows.forEach(row => {
-    row.querySelector('.device-header').addEventListener('click', e => {
-      if (e.target.closest('.drag-handle')) return;
-      toggleCollapsed(row.dataset.id);
-    });
-    row.addEventListener('dragstart', e => {
-      if (!e.target.closest('.drag-handle') && e.target !== row) { e.preventDefault(); return; }
-      dragged = row; setTimeout(() => row.classList.add('dragging'), 0);
-    });
-    row.addEventListener('dragend', () => {
-      row.classList.remove('dragging');
-      list.querySelectorAll('.device-row').forEach(r => r.classList.remove('drag-over'));
-      persistOrder();
-    });
-    row.addEventListener('dragover', e => {
-      e.preventDefault();
-      if (row !== dragged) {
-        list.querySelectorAll('.device-row').forEach(r => r.classList.remove('drag-over'));
-        row.classList.add('drag-over');
-      }
-    });
-    row.addEventListener('drop', e => {
-      e.preventDefault();
-      if (row !== dragged) {
-        const all = [...list.querySelectorAll('.device-row')];
-        if (all.indexOf(dragged) < all.indexOf(row)) row.after(dragged);
-        else row.before(dragged);
-      }
-    });
+// Drag & Drop
+function initInteractions(){
+  const list=document.getElementById('device-list');
+  const rows=[...list.querySelectorAll('.device-row')];
+  let dragged=null;
+  rows.forEach(row=>{
+    row.querySelector('.device-header').addEventListener('click',e=>{if(!e.target.closest('.drag-handle'))toggleCollapsed(row.dataset.id);});
+    row.addEventListener('dragstart',e=>{if(!e.target.closest('.drag-handle')&&e.target!==row){e.preventDefault();return;}dragged=row;setTimeout(()=>row.classList.add('dragging'),0);});
+    row.addEventListener('dragend',()=>{row.classList.remove('dragging');list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));persistOrder();});
+    row.addEventListener('dragover',e=>{e.preventDefault();if(row!==dragged){list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));row.classList.add('drag-over');}});
+    row.addEventListener('drop',e=>{e.preventDefault();if(row!==dragged){const all=[...list.querySelectorAll('.device-row')];all.indexOf(dragged)<all.indexOf(row)?row.after(dragged):row.before(dragged);}});
   });
-
-  // Táctil
-  let touchDragged = null, touchClone = null, touchOffsetY = 0;
-  rows.forEach(row => {
-    row.querySelector('.drag-handle').addEventListener('touchstart', e => {
-      touchDragged = row;
-      const touch = e.touches[0], rect = row.getBoundingClientRect();
-      touchOffsetY = touch.clientY - rect.top;
-      touchClone = row.cloneNode(true);
-      Object.assign(touchClone.style, {
-        position:'fixed', zIndex:1000, width:rect.width+'px',
-        left:rect.left+'px', top:rect.top+'px', opacity:.85,
-        pointerEvents:'none', border:'1px solid var(--green)',
-        borderRadius:'8px', background:'var(--panel)', transition:'none',
-      });
-      document.body.appendChild(touchClone);
-      row.classList.add('dragging'); e.preventDefault();
-    }, {passive:false});
+  let td=null,tc=null,tOY=0;
+  rows.forEach(row=>{
+    row.querySelector('.drag-handle').addEventListener('touchstart',e=>{
+      td=row;const t=e.touches[0],r=row.getBoundingClientRect();tOY=t.clientY-r.top;
+      tc=row.cloneNode(true);Object.assign(tc.style,{position:'fixed',zIndex:1000,width:r.width+'px',left:r.left+'px',top:r.top+'px',opacity:.85,pointerEvents:'none',border:'1px solid var(--green)',borderRadius:'8px',background:'var(--panel)',transition:'none'});
+      document.body.appendChild(tc);row.classList.add('dragging');e.preventDefault();
+    },{passive:false});
   });
-
-  document.addEventListener('touchmove', e => {
-    if (!touchDragged || !touchClone) return;
-    const touch = e.touches[0];
-    touchClone.style.top = (touch.clientY - touchOffsetY) + 'px';
-    touchClone.style.display = 'none';
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    touchClone.style.display = '';
-    const target = el && el.closest('.device-row');
-    list.querySelectorAll('.device-row').forEach(r => r.classList.remove('drag-over'));
-    if (target && target !== touchDragged) target.classList.add('drag-over');
-    e.preventDefault();
-  }, {passive:false});
-
-  document.addEventListener('touchend', e => {
-    if (!touchDragged) return;
-    const touch = e.changedTouches[0];
-    if (touchClone) { touchClone.remove(); touchClone = null; }
-    touchDragged.classList.remove('dragging');
-    list.querySelectorAll('.device-row').forEach(r => r.classList.remove('drag-over'));
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    const target = el && el.closest('.device-row');
-    if (target && target !== touchDragged) {
-      const all = [...list.querySelectorAll('.device-row')];
-      if (all.indexOf(touchDragged) < all.indexOf(target)) target.after(touchDragged);
-      else target.before(touchDragged);
-    }
-    persistOrder(); touchDragged = null;
+  document.addEventListener('touchmove',e=>{
+    if(!td||!tc)return;const t=e.touches[0];tc.style.top=(t.clientY-tOY)+'px';
+    tc.style.display='none';const el=document.elementFromPoint(t.clientX,t.clientY);tc.style.display='';
+    const tgt=el&&el.closest('.device-row');list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));
+    if(tgt&&tgt!==td)tgt.classList.add('drag-over');e.preventDefault();
+  },{passive:false});
+  document.addEventListener('touchend',e=>{
+    if(!td)return;const t=e.changedTouches[0];if(tc){tc.remove();tc=null;}td.classList.remove('dragging');
+    list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));
+    const el=document.elementFromPoint(t.clientX,t.clientY);const tgt=el&&el.closest('.device-row');
+    if(tgt&&tgt!==td){const all=[...list.querySelectorAll('.device-row')];all.indexOf(td)<all.indexOf(tgt)?tgt.after(td):tgt.before(td);}
+    persistOrder();td=null;
   });
 }
+function persistOrder(){saveOrder([...document.querySelectorAll('.device-row')].map(r=>r.dataset.id));}
 
-function persistOrder() {
-  saveOrder([...document.querySelectorAll('.device-row')].map(r => r.dataset.id));
+// Fetch
+async function refresh(){
+  try{
+    const data=await(await fetch('/api/status')).json();
+    renderSummary(data.devices);renderDevices(data.devices);
+    document.getElementById('footer-note').textContent=`Actualizado cada ${REFRESH_MS/1000}s · ${new Date(data.server_time*1000).toLocaleTimeString('es-ES')}`;
+  }catch{document.getElementById('footer-note').textContent='Sin conexión. Reintentando…';}
 }
-</script>
+refresh();setInterval(refresh,REFRESH_MS);
 
-<script>
-// --- Fetch y refresco ---
-async function refresh() {
-  try {
-    const res = await fetch('/api/status');
-    const data = await res.json();
-    renderSummary(data.devices);
-    renderDevices(data.devices);
-    document.getElementById('footer-note').textContent =
-      `Actualizado cada ${REFRESH_MS/1000}s · servidor: ${new Date(data.server_time*1000).toLocaleTimeString('es-ES')}`;
-  } catch {
-    document.getElementById('footer-note').textContent = 'Sin conexión con el servidor. Reintentando…';
-  }
-}
-refresh();
-setInterval(refresh, REFRESH_MS);
-
-// --- Notificaciones Push ---
-let swReg = null;
-
-async function initPush() {
-  const btn = document.getElementById('notif-btn');
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    btn.textContent = '🔕 No soportado'; btn.classList.add('unsupported'); btn.onclick = null; return;
-  }
-  swReg = await navigator.serviceWorker.register('/static/sw.js');
+// Push
+let swReg=null;
+async function initPush(){
+  const btn=document.getElementById('notif-btn');
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){btn.textContent='🔕';return;}
+  swReg=await navigator.serviceWorker.register('/static/sw.js');
   await navigator.serviceWorker.ready;
-  const sub = await swReg.pushManager.getSubscription();
-  if (sub) { btn.textContent = '🔕 Desactivar alertas'; btn.classList.add('inactive'); }
+  const sub=await swReg.pushManager.getSubscription();
+  if(sub){btn.textContent='🔕';btn.classList.add('notif-on');}
 }
-
-async function toggleNotifications() {
-  const btn = document.getElementById('notif-btn');
-  if (!swReg) return;
-  const sub = await swReg.pushManager.getSubscription();
-  if (sub) {
+async function toggleNotifications(){
+  const btn=document.getElementById('notif-btn');if(!swReg)return;
+  const sub=await swReg.pushManager.getSubscription();
+  if(sub){
     await sub.unsubscribe();
-    await fetch('/api/unsubscribe', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({endpoint:sub.endpoint}) });
-    btn.textContent = '🔔 Alertas'; btn.classList.remove('active','inactive'); return;
+    await fetch('/api/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});
+    btn.textContent='🔔';btn.classList.remove('notif-on');return;
   }
-  const perm = await Notification.requestPermission();
-  if (perm !== 'granted') { btn.textContent = '🚫 Denegado'; return; }
-  const { publicKey } = await (await fetch('/api/vapid-key')).json();
-  const newSub = await swReg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(publicKey) });
-  await fetch('/api/subscribe', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(newSub.toJSON()) });
-  btn.textContent = '🔕 Desactivar alertas'; btn.classList.remove('active'); btn.classList.add('inactive');
+  const perm=await Notification.requestPermission();
+  if(perm!=='granted'){btn.textContent='🚫';return;}
+  const{publicKey}=await(await fetch('/api/vapid-key')).json();
+  const newSub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(publicKey)});
+  await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(newSub.toJSON())});
+  btn.textContent='🔕';btn.classList.add('notif-on');
 }
-
-function urlBase64ToUint8Array(b64) {
-  const pad = '='.repeat((4 - b64.length%4)%4);
-  const raw = atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/'));
-  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+function urlBase64ToUint8Array(b64){
+  const pad='='.repeat((4-b64.length%4)%4);
+  const raw=atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/'));
+  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
 }
-
 initPush();
 </script>
 </body>

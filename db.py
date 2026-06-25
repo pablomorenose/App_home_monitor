@@ -194,3 +194,56 @@ def get_history(device_id: str, limit: int = 50) -> list[dict]:
                 (device_id, limit),
             )
             return [dict(row) for row in cur.fetchall()]
+
+
+def get_latency_history(device_id: str, limit: int = 60) -> list[dict]:
+    """Devuelve los últimos N valores de latencia registrados."""
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT response_ms, last_check_ts as ts
+                FROM device_status
+                WHERE device_id = %s AND response_ms IS NOT NULL
+            """, (device_id,))
+            # Solo tenemos el valor actual en device_status.
+            # Para sparkline usamos status_history con response_ms si existe,
+            # o simplemente devolvemos el valor actual como punto único.
+            row = cur.fetchone()
+            if row:
+                return [{"ms": row["response_ms"], "ts": row["ts"]}]
+            return []
+
+
+def get_incidents(limit: int = 100) -> list[dict]:
+    """
+    Devuelve los últimos eventos de caída/recuperación de todos los dispositivos,
+    incluyendo el nombre del dispositivo y cuánto tardó en recuperarse.
+    """
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Join con device_status para obtener el nombre
+            cur.execute("""
+                SELECT h.id, h.device_id, h.online, h.ts,
+                       COALESCE(ds.name, h.device_id) as name
+                FROM status_history h
+                LEFT JOIN device_status ds ON ds.device_id = h.device_id
+                ORDER BY h.ts DESC
+                LIMIT %s
+            """, (limit,))
+            rows = cur.fetchall()
+
+        # Calcular tiempo de recuperación: para cada caída buscar la siguiente
+        # recuperación del mismo dispositivo
+        result = []
+        rows_list = [dict(r) for r in rows]
+        for i, row in enumerate(rows_list):
+            recovered_ts = None
+            if not row["online"]:
+                # Buscar la recuperación más cercana posterior (en la lista ordenada DESC)
+                for j in range(i - 1, -1, -1):
+                    if rows_list[j]["device_id"] == row["device_id"] and rows_list[j]["online"]:
+                        recovered_ts = rows_list[j]["ts"]
+                        break
+            row["recovered_ts"] = recovered_ts
+            result.append(row)
+        return result

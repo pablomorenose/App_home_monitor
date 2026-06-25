@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeM — Acceso</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#0b0e0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<style>
+  :root {
+    --bg: #0b0e0d; --panel: #111513; --panel-border: #1f2723;
+    --text-primary: #e7ece9; --text-dim: #6f7d76;
+    --green: #3ddc84; --red: #ff5c5c;
+    --mono: "IBM Plex Mono","SF Mono",Consolas,monospace;
+    --sans: "Inter",-apple-system,sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg);
+    background-image: radial-gradient(circle at 50% 20%, rgba(61,220,132,0.06), transparent 50%);
+    color: var(--text-primary); font-family: var(--sans);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .login-box {
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 12px; padding: 32px; width: 100%; max-width: 340px;
+    text-align: center;
+  }
+  .logo { font-size: 32px; margin-bottom: 8px; }
+  h1 { font-size: 20px; font-weight: 650; margin: 0 0 4px; }
+  .sub { font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+         text-transform: uppercase; letter-spacing: .1em; margin-bottom: 28px; }
+  .form-group { margin-bottom: 16px; text-align: left; }
+  .form-group label { display: block; font-family: var(--mono); font-size: 11px;
+    color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .08em; }
+  .form-group input {
+    width: 100%; background: #0b0e0d; border: 1px solid var(--panel-border);
+    border-radius: 6px; color: var(--text-primary); font-family: var(--mono);
+    font-size: 14px; padding: 10px 12px; outline: none; transition: border-color .2s;
+  }
+  .form-group input:focus { border-color: var(--green); }
+  .btn {
+    width: 100%; background: var(--green); color: #0b0e0d; border: none;
+    border-radius: 6px; font-family: var(--mono); font-size: 13px;
+    font-weight: 700; padding: 12px; cursor: pointer; transition: opacity .2s;
+    margin-top: 4px;
+  }
+  .btn:hover { opacity: .85; }
+  .error { color: var(--red); font-family: var(--mono); font-size: 12px;
+           margin-bottom: 16px; padding: 8px 12px; border: 1px solid rgba(255,92,92,.3);
+           border-radius: 6px; background: rgba(255,92,92,.06); }
+</style>
+</head>
+<body>
+<div class="login-box">
+  <div class="logo">🏠</div>
+  <h1>HomeM</h1>
+  <div class="sub">Monitor de infraestructura</div>
+  {% if error %}
+  <div class="error">{{ error }}</div>
+  {% endif %}
+  <form method="post">
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" name="password" autofocus placeholder="••••••••">
+    </div>
+    <button type="submit" class="btn">Entrar</button>
+  </form>
+</div>
+</body>
+</html>

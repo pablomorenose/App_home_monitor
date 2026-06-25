@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeM — Historial</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#0b0e0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<style>
+  :root {
+    --bg: #0b0e0d; --panel: #111513; --panel-border: #1f2723;
+    --text-primary: #e7ece9; --text-dim: #6f7d76;
+    --green: #3ddc84; --red: #ff5c5c; --amber: #ffb454;
+    --mono: "IBM Plex Mono","SF Mono",Consolas,monospace;
+    --sans: "Inter",-apple-system,sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg);
+    background-image: radial-gradient(circle at 15% 0%,rgba(61,220,132,0.05),transparent 40%);
+    color: var(--text-primary); font-family: var(--sans);
+    min-height: 100vh; padding: 28px 20px 60px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--panel-border); padding-bottom: 16px; margin-bottom: 24px;
+  }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
+  h1 { font-size: 20px; font-weight: 650; margin: 0; }
+  .back-btn {
+    font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+    text-decoration: none; border: 1px solid var(--panel-border); border-radius: 6px;
+    padding: 5px 12px; transition: border-color .2s, color .2s;
+  }
+  .back-btn:hover { border-color: var(--green); color: var(--green); }
+  .incident-list { display: flex; flex-direction: column; gap: 6px; }
+  .incident {
+    display: grid; grid-template-columns: 10px 1fr auto;
+    align-items: center; gap: 14px;
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 8px; padding: 12px 16px;
+  }
+  .incident.down { border-left: 3px solid var(--red); }
+  .incident.up   { border-left: 3px solid var(--green); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.down { background: var(--red); }
+  .dot.up   { background: var(--green); }
+  .incident-info .name { font-size: 14px; font-weight: 600; }
+  .incident-info .detail { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .incident-meta { text-align: right; font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+  .duration { color: var(--amber); margin-top: 2px; }
+  .empty { text-align: center; font-family: var(--mono); font-size: 13px; color: var(--text-dim); padding: 60px 0; }
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-btn {
+    font-family: var(--mono); font-size: 11px; padding: 4px 12px;
+    border: 1px solid var(--panel-border); border-radius: 20px;
+    background: none; color: var(--text-dim); cursor: pointer;
+    transition: border-color .2s, color .2s;
+  }
+  .filter-btn.active { border-color: var(--green); color: var(--green); background: rgba(61,220,132,.08); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">HomeM</div>
+      <h1>Historial de incidencias</h1>
+    </div>
+    <a href="/" class="back-btn">← Panel</a>
+  </header>
+
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all',this)">Todos</button>
+    <button class="filter-btn" onclick="setFilter('down',this)">Solo caídas</button>
+    <button class="filter-btn" onclick="setFilter('up',this)">Solo recuperaciones</button>
+  </div>
+
+  <div class="incident-list" id="incident-list">
+    <div class="empty">Cargando…</div>
+  </div>
+</div>
+
+<script>
+let allIncidents = [];
+let currentFilter = 'all';
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderIncidents();
+}
+
+function renderIncidents() {
+  const list = document.getElementById('incident-list');
+  const filtered = currentFilter === 'all' ? allIncidents
+    : allIncidents.filter(i => currentFilter === 'down' ? !i.online : i.online);
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">Sin incidencias registradas</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(i => {
+    const cls = i.online ? 'up' : 'down';
+    const label = i.online ? '✅ Recuperado' : '🔴 Caída detectada';
+    const dur = (!i.online && i.duration) ? `<div class="duration">Duración: ${i.duration}</div>` : '';
+    return `
+      <div class="incident ${cls}">
+        <div class="dot ${cls}"></div>
+        <div class="incident-info">
+          <div class="name">${i.name}</div>
+          <div class="detail">${label}${dur ? '' : ''}</div>
+          ${dur}
+        </div>
+        <div class="incident-meta">
+          <div>${i.ts_human}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function load() {
+  try {
+    const res = await fetch('/api/incidents');
+    const data = await res.json();
+    allIncidents = data.incidents;
+    renderIncidents();
+  } catch {
+    document.getElementById('incident-list').innerHTML =
+      '<div class="empty">Error al cargar el historial</div>';
+  }
+}
+
+load();
+</script>
+</body>
+</html>
