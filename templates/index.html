@@ -147,6 +147,9 @@
   .btn-xs.maint.active{background:rgba(255,180,84,.1);}
   .badge-maint{font-family:var(--mono);font-size:9px;color:var(--amber);
     border:1px solid rgba(255,180,84,.4);border-radius:3px;padding:1px 5px;margin-left:4px;}
+  .ha-sensors{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;}
+  .ha-sensor{font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+  .ha-sensor span{font-weight:600;color:var(--text-primary);}
 
   footer{margin-top:28px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text-dim);}
 
@@ -307,6 +310,7 @@ function renderDevices(devices){
     const since=d.online?`Estable ${d.since_human}`:`Caido ${d.since_human}`;
     const err=d.last_error?`<span class="error-text"> · ${d.last_error}</span>`:'';
     const maintBadge=d.in_maintenance?`<span class="badge-maint">🔧 mantenimiento</span>`:'';
+    const haSensors=d.id==='home_assistant'?`<div id="ha-sensors" class="ha-sensors"></div>`:'';
     return`<div class="device-row ${rc}" draggable="true" data-id="${d.id}">
       <div class="device-header">
         <div class="led ${lc}"></div>
@@ -323,6 +327,7 @@ function renderDevices(devices){
           <div class="device-left">
             <div class="device-meta">${d.id}${err}</div>
             <div class="since-row">${since}</div>
+            ${haSensors}
             ${sparklineHtml(d.id)}
           </div>
           <div class="device-right">
@@ -344,6 +349,7 @@ function renderDevices(devices){
   }).join('');
   initInteractions();
   ordered.forEach(d=>{loadUptime(d.id);loadLatency(d.id);});
+  loadHaSensors();
 }
 
 async function loadUptime(id){
@@ -457,6 +463,19 @@ function initInteractions(){
 function persistOrder(){saveOrder([...document.querySelectorAll('.device-row')].map(r=>r.dataset.id));}
 
 // Fetch
+async function loadHaSensors(){
+  const el=document.getElementById('ha-sensors');
+  if(!el)return;
+  try{
+    const data=await(await fetch('/api/ha-sensors')).json();
+    const cpu=data['sensor.system_monitor_temperatura_del_procesador'];
+    const ram=data['sensor.system_monitor_uso_de_memoria_2'];
+    el.innerHTML=
+      (cpu?`<div class="ha-sensor">🌡 CPU <span>${cpu.state}${cpu.unit}</span></div>`:'')
+     +(ram?`<div class="ha-sensor">💾 RAM <span>${ram.state}${ram.unit}</span></div>`:'');
+  }catch{}
+}
+
 async function toggleMaintenance(id, isActive){
   if(isActive){
     await fetch(`/api/devices/${id}/maintenance`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hours:0})});

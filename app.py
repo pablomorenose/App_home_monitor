@@ -113,6 +113,32 @@ def api_maintenance(device_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/ha-sensors")
+def api_ha_sensors():
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    from config import HOME_ASSISTANT_TOKEN, HOME_ASSISTANT_URL
+    import requests as req
+    sensors = [
+        "sensor.system_monitor_temperatura_del_procesador",
+        "sensor.system_monitor_uso_de_memoria_2",
+    ]
+    result = {}
+    headers = {"Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}"}
+    for entity_id in sensors:
+        try:
+            r = req.get(f"{HOME_ASSISTANT_URL.rstrip('/')}/api/states/{entity_id}",
+                        headers=headers, timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+                result[entity_id] = {
+                    "state": data.get("state"),
+                    "unit": data.get("attributes", {}).get("unit_of_measurement", ""),
+                }
+        except Exception:
+            pass
+    return jsonify(result)
+
+
 @app.route("/api/status")
 def api_status():
     if require_auth():
