@@ -95,15 +95,36 @@ def historial():
     return render_template("historial.html")
 
 
+@app.route("/api/force-check", methods=["POST"])
+def api_force_check():
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    from monitor_worker import run_checks_once
+    import threading
+    threading.Thread(target=run_checks_once, daemon=True).start()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/devices/<device_id>/maintenance", methods=["POST"])
+def api_maintenance(device_id):
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    hours = float(request.json.get("hours", 0))
+    from db import set_maintenance
+    set_maintenance(device_id, hours)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/status")
 def api_status():
     if require_auth():
         return jsonify({"error": "No autorizado"}), 401
     now = time.time()
     statuses = get_all_statuses()
+    devices_cfg = {d["id"]: d for d in get_all_devices()}
     result = []
     for s in statuses:
         since_seconds = now - s["last_change_ts"]
+        cfg = devices_cfg.get(s["device_id"], {})
+        maintenance_until = cfg.get("maintenance_until", 0)
         result.append({
             "id": s["device_id"],
             "name": s["name"],
@@ -113,6 +134,8 @@ def api_status():
             "last_check_seconds_ago": now - s["last_check_ts"],
             "last_error": s["last_error"],
             "response_ms": s.get("response_ms"),
+            "maintenance_until": maintenance_until,
+            "in_maintenance": maintenance_until > now,
         })
     result.sort(key=lambda d: d["name"])
     return jsonify({"server_time": now, "devices": result})

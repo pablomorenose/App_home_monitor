@@ -143,6 +143,10 @@
   }
   .btn-xs.edit:hover{border-color:var(--blue);color:var(--blue);}
   .btn-xs.del:hover{border-color:var(--red);color:var(--red);}
+  .btn-xs.maint{border-color:var(--amber);color:var(--amber);}
+  .btn-xs.maint.active{background:rgba(255,180,84,.1);}
+  .badge-maint{font-family:var(--mono);font-size:9px;color:var(--amber);
+    border:1px solid rgba(255,180,84,.4);border-radius:3px;padding:1px 5px;margin-left:4px;}
 
   footer{margin-top:28px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text-dim);}
 
@@ -191,6 +195,7 @@
       <span class="clock" id="clock">--:--:--</span>
       <button class="btn theme-btn" id="theme-btn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
       <a href="/historial" class="btn" title="Historial">📋</a>
+      <button class="btn" id="check-btn" onclick="forceCheck()" title="Comprobar ahora">⟳</button>
       <button class="btn add" onclick="openModal()" title="Añadir dispositivo">＋</button>
       <button class="btn" id="notif-btn" onclick="toggleNotifications()">🔔</button>
     </div>
@@ -299,14 +304,16 @@ function renderDevices(devices){
     const rc=(d.online?'':'is-down')+(collapsed[d.id]?' collapsed':'');
     const sc=d.online?'up':'down';
     const sl=d.online?'Online':'Offline';
-    const since=d.online?`Estable ${d.since_human}`:`Caído ${d.since_human}`;
+    const since=d.online?`Estable ${d.since_human}`:`Caido ${d.since_human}`;
     const err=d.last_error?`<span class="error-text"> · ${d.last_error}</span>`:'';
+    const maintBadge=d.in_maintenance?`<span class="badge-maint">🔧 mantenimiento</span>`:'';
     return`<div class="device-row ${rc}" draggable="true" data-id="${d.id}">
       <div class="device-header">
         <div class="led ${lc}"></div>
         <div class="device-name-row">
           <span class="device-name">${d.name}</span>
           <span class="status-inline ${sc}">${sl}</span>
+          ${maintBadge}
         </div>
         <div class="collapse-btn">▾</div>
         <div class="drag-handle">⠿</div>
@@ -329,6 +336,7 @@ function renderDevices(devices){
         </div>
         <div class="device-actions">
           <button class="btn-xs edit" onclick="editDevice('${d.id}')">✏️ Editar</button>
+          <button class="btn-xs maint ${d.in_maintenance?'active':''}" onclick="toggleMaintenance('${d.id}',${d.in_maintenance})">🔧 ${d.in_maintenance?'Fin mantenimiento':'Mantenimiento'}</button>
           <button class="btn-xs del" onclick="confirmDelete('${d.id}','${d.name}')">🗑 Borrar</button>
         </div>
       </div></div>
@@ -449,6 +457,24 @@ function initInteractions(){
 function persistOrder(){saveOrder([...document.querySelectorAll('.device-row')].map(r=>r.dataset.id));}
 
 // Fetch
+async function toggleMaintenance(id, isActive){
+  if(isActive){
+    await fetch(`/api/devices/${id}/maintenance`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hours:0})});
+  } else {
+    const h=prompt('Horas de mantenimiento (ej: 1, 2, 0.5):','1');
+    if(!h)return;
+    await fetch(`/api/devices/${id}/maintenance`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hours:parseFloat(h)})});
+  }
+  refresh();
+}
+
+async function forceCheck(){
+  const btn=document.getElementById('check-btn');
+  btn.textContent='⟳';btn.disabled=true;btn.style.opacity='.5';
+  await fetch('/api/force-check',{method:'POST'});
+  setTimeout(()=>{refresh();btn.disabled=false;btn.style.opacity='';}, 2000);
+}
+
 async function refresh(){
   try{
     const data=await(await fetch('/api/status')).json();

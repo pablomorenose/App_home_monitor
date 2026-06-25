@@ -74,6 +74,10 @@ def init_db():
                 ALTER TABLE status_history
                 ADD COLUMN IF NOT EXISTS response_ms INTEGER
             """)
+            cur.execute("""
+                ALTER TABLE devices
+                ADD COLUMN IF NOT EXISTS maintenance_until DOUBLE PRECISION NOT NULL DEFAULT 0
+            """)
 
 
 # -----------------------------------------------------------------------
@@ -84,7 +88,7 @@ def get_all_devices() -> list[dict]:
     """Devuelve todos los dispositivos configurados."""
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT * FROM devices WHERE enabled = 1 ORDER BY created_at")
+            cur.execute("SELECT id, name, type, config_json, enabled, created_at, COALESCE(maintenance_until, 0) as maintenance_until FROM devices WHERE enabled = 1 ORDER BY created_at")
             rows = cur.fetchall()
             result = []
             for row in rows:
@@ -212,6 +216,25 @@ def get_latency_history(device_id: str, limit: int = 60) -> list[dict]:
             """, (device_id, limit))
             rows = cur.fetchall()
             return [dict(r) for r in reversed(rows)]
+
+
+def set_maintenance(device_id: str, hours: float):
+    """Activa modo mantenimiento durante `hours` horas (0 = desactivar)."""
+    until = time.time() + hours * 3600 if hours > 0 else 0
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE devices SET maintenance_until = %s WHERE id = %s",
+                (until, device_id),
+            )
+
+
+def cleanup_old_history(days: int = 30):
+    """Borra registros de status_history con mas de `days` dias de antiguedad."""
+    cutoff = time.time() - days * 86400
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM status_history WHERE ts < %s", (cutoff,))
 
 
 def get_incidents(limit: int = 100) -> list[dict]:
