@@ -125,7 +125,7 @@ def api_status():
 @app.route("/api/uptime/<device_id>")
 def api_uptime(device_id):
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
-    Devuelve segmentos de estado para las últimas 24h.
+    """Devuelve segmentos de estado para las últimas 24h.
     Cada segmento tiene: start, end, online (bool).
     """
     now = time.time()
