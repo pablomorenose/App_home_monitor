@@ -269,15 +269,17 @@ function latencyHtml(ms){
   return`<div class="latency ${cls}">${lbl}</div>`;
 }
 
-// Sparkline SVG (mini gráfica de línea)
+// Sparkline SVG (mini grafica de linea)
 const sparkCache={};
 function sparklineHtml(id){
   const pts=sparkCache[id];
   if(!pts||pts.length<2)return'';
-  const W=60,H=18,max=Math.max(...pts,1),min=Math.min(...pts,0);
+  const W=80,H=24,max=Math.max(...pts,1),min=Math.min(...pts,0);
   const range=max-min||1;
+  const avg=pts.reduce((a,b)=>a+b,0)/pts.length;
+  const color=avg>2000?'var(--red)':avg>500?'var(--amber)':'var(--green)';
   const coords=pts.map((v,i)=>`${(i/(pts.length-1)*W).toFixed(1)},${(H-(v-min)/range*H).toFixed(1)}`).join(' ');
-  return`<div class="sparkline-wrap"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline points="${coords}" fill="none" stroke="var(--blue)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg></div>`;
+  return`<div class="sparkline-wrap" title="Latencia (${pts.length} muestras, media ${Math.round(avg)}ms)"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline points="${coords}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg></div>`;
 }
 
 // Summary

@@ -70,6 +70,10 @@ def init_db():
                 ALTER TABLE device_status
                 ADD COLUMN IF NOT EXISTS response_ms INTEGER
             """)
+            cur.execute("""
+                ALTER TABLE status_history
+                ADD COLUMN IF NOT EXISTS response_ms INTEGER
+            """)
 
 
 # -----------------------------------------------------------------------
@@ -157,8 +161,8 @@ def update_status(device_id: str, name: str, online: bool,
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """, (device_id, name, int(online), now, now, error, response_ms))
                 cur.execute(
-                    "INSERT INTO status_history (device_id, online, ts) VALUES (%s, %s, %s)",
-                    (device_id, int(online), now),
+                    "INSERT INTO status_history (device_id, online, ts, response_ms) VALUES (%s, %s, %s, %s)",
+                    (device_id, int(online), now, response_ms),
                 )
                 return
 
@@ -172,11 +176,11 @@ def update_status(device_id: str, name: str, online: bool,
                 WHERE device_id = %s
             """, (name, int(online), last_change_ts, now, error, response_ms, device_id))
 
-            if changed:
-                cur.execute(
-                    "INSERT INTO status_history (device_id, online, ts) VALUES (%s, %s, %s)",
-                    (device_id, int(online), now),
-                )
+            # Guardar siempre la latencia para sparkline, solo guardar cambio de estado si cambio
+            cur.execute(
+                "INSERT INTO status_history (device_id, online, ts, response_ms) VALUES (%s, %s, %s, %s)",
+                (device_id, int(online), now, response_ms),
+            )
 
 
 def get_all_statuses() -> list[dict]:
@@ -197,21 +201,17 @@ def get_history(device_id: str, limit: int = 50) -> list[dict]:
 
 
 def get_latency_history(device_id: str, limit: int = 60) -> list[dict]:
-    """Devuelve los últimos N valores de latencia registrados."""
+    """Devuelve los ultimos N valores de latencia registrados."""
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                SELECT response_ms, last_check_ts as ts
-                FROM device_status
+                SELECT response_ms as ms, ts
+                FROM status_history
                 WHERE device_id = %s AND response_ms IS NOT NULL
-            """, (device_id,))
-            # Solo tenemos el valor actual en device_status.
-            # Para sparkline usamos status_history con response_ms si existe,
-            # o simplemente devolvemos el valor actual como punto único.
-            row = cur.fetchone()
-            if row:
-                return [{"ms": row["response_ms"], "ts": row["ts"]}]
-            return []
+                ORDER BY ts DESC LIMIT %s
+            """, (device_id, limit))
+            rows = cur.fetchall()
+            return [dict(r) for r in reversed(rows)]
 
 
 def get_incidents(limit: int = 100) -> list[dict]:
