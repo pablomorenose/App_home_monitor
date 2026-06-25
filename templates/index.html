@@ -467,19 +467,22 @@ async function initPush(){
   if(sub){btn.textContent='🔕';btn.classList.add('notif-on');}
 }
 async function toggleNotifications(){
-  const btn=document.getElementById('notif-btn');if(!swReg)return;
+  const btn=document.getElementById('notif-btn');
+  if(!swReg){alert('El service worker aun no esta listo. Espera un momento y vuelve a intentarlo.');return;}
   const sub=await swReg.pushManager.getSubscription();
   if(sub){
     await sub.unsubscribe();
     await fetch('/api/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});
-    btn.textContent='🔔';btn.classList.remove('notif-on');return;
+    btn.textContent='🔔';btn.classList.remove('notif-on');
+    alert('Notificaciones desactivadas.');return;
   }
   const perm=await Notification.requestPermission();
-  if(perm!=='granted'){btn.textContent='🚫';return;}
+  if(perm!=='granted'){btn.textContent='🚫';alert('Permiso de notificaciones denegado en el navegador.');return;}
   const{publicKey}=await(await fetch('/api/vapid-key')).json();
   const newSub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(publicKey)});
   await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(newSub.toJSON())});
   btn.textContent='🔕';btn.classList.add('notif-on');
+  alert('Notificaciones activadas correctamente.');
 }
 function urlBase64ToUint8Array(b64){
   const pad='='.repeat((4-b64.length%4)%4);
