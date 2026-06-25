@@ -239,7 +239,7 @@
 </div>
 
 <script>
-const REFRESH_MS=5000,ORDER_KEY='homem_order',COLLAPSED_KEY='homem_collapsed';
+const REFRESH_MS=15000,ORDER_KEY='homem_order',COLLAPSED_KEY='homem_collapsed';
 let editingId=null;
 
 // Reloj
@@ -494,12 +494,55 @@ async function forceCheck(){
   setTimeout(()=>{refresh();btn.disabled=false;btn.style.opacity='';}, 2000);
 }
 
+let _firstRender=true;
+
 async function refresh(){
   try{
     const data=await(await fetch('/api/status')).json();
-    renderSummary(data.devices);renderDevices(data.devices);
+    renderSummary(data.devices);
+    if(_firstRender){
+      renderDevices(data.devices);
+      _firstRender=false;
+    } else {
+      // Actualizar solo los datos dinamicos sin re-renderizar las tarjetas
+      data.devices.forEach(d=>{
+        const row=document.querySelector(`.device-row[data-id="${d.id}"]`);
+        if(!row)return;
+        // LED y clase
+        const led=row.querySelector('.led');
+        if(led){led.className='led '+(d.online?'on':'off');}
+        row.classList.toggle('is-down',!d.online);
+        // Status inline
+        const si=row.querySelector('.status-inline');
+        if(si){si.className='status-inline '+(d.online?'up':'down');si.textContent=d.online?'Online':'Offline';}
+        // Since
+        const sr=row.querySelector('.since-row');
+        if(sr)sr.textContent=d.online?`Estable ${d.since_human}`:`Caido ${d.since_human}`;
+        // Latencia
+        const dr=row.querySelector('.device-right');
+        if(dr){
+          const lh=dr.querySelector('.latency');
+          const newLh=document.createElement('div');
+          newLh.innerHTML=latencyHtml(d.response_ms);
+          if(lh)lh.replaceWith(newLh.firstChild||lh);
+          else if(newLh.firstChild)dr.prepend(newLh.firstChild);
+        }
+        // Maintenance badge
+        const nameRow=row.querySelector('.device-name-row');
+        const oldBadge=nameRow&&nameRow.querySelector('.badge-maint');
+        if(nameRow){
+          if(d.in_maintenance&&!oldBadge){
+            const b=document.createElement('span');b.className='badge-maint';b.textContent='🔧 mantenimiento';nameRow.appendChild(b);
+          } else if(!d.in_maintenance&&oldBadge){oldBadge.remove();}
+        }
+        // Boton mantenimiento
+        const mb=row.querySelector('.btn-xs.maint');
+        if(mb){mb.textContent='🔧 '+(d.in_maintenance?'Fin mantenimiento':'Mantenimiento');mb.classList.toggle('active',d.in_maintenance);mb.onclick=()=>toggleMaintenance(d.id,d.in_maintenance);}
+      });
+    }
     document.getElementById('footer-note').textContent=`Actualizado cada ${REFRESH_MS/1000}s · ${new Date(data.server_time*1000).toLocaleTimeString('es-ES')}`;
-  }catch{document.getElementById('footer-note').textContent='Sin conexión. Reintentando…';}
+    loadHaSensors();
+  }catch{document.getElementById('footer-note').textContent='Sin conexion. Reintentando…';}
 }
 refresh();setInterval(refresh,REFRESH_MS);
 
