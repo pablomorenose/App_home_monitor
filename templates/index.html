@@ -151,6 +151,27 @@
   .ha-sensor{font-family:var(--mono);font-size:11px;color:var(--text-dim);}
   .ha-sensor span{font-weight:600;color:var(--text-primary);}
 
+  /* Toggle switch */
+  .toggle-wrap{display:flex;align-items:center;gap:8px;padding:6px 0 10px;}
+  .toggle-label{font-family:var(--mono);font-size:10px;color:var(--text-dim);}
+  .toggle{position:relative;width:36px;height:20px;flex-shrink:0;}
+  .toggle input{opacity:0;width:0;height:0;}
+  .toggle-slider{
+    position:absolute;cursor:pointer;inset:0;
+    background:var(--panel-border);border-radius:20px;
+    transition:background .2s;
+  }
+  .toggle-slider:before{
+    content:'';position:absolute;height:14px;width:14px;
+    left:3px;bottom:3px;background:white;border-radius:50%;
+    transition:transform .2s;
+  }
+  .toggle input:checked + .toggle-slider{background:var(--green);}
+  .toggle input:checked + .toggle-slider:before{transform:translateX(16px);}
+  .toggle-status{font-family:var(--mono);font-size:10px;font-weight:600;}
+  .toggle-status.on{color:var(--green);}
+  .toggle-status.off{color:var(--text-dim);}
+
   footer{margin-top:28px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text-dim);}
 
   @media(max-width:520px){
@@ -221,6 +242,7 @@
         <option value="ping">Ping — IP en red local</option>
         <option value="port">Puerto TCP</option>
         <option value="ha_entity">Entidad Home Assistant</option>
+        <option value="ha_switch">Switch Home Assistant (toggle)</option>
       </select>
     </div>
     <div id="fields-http"><div class="fg"><label>URL</label><input type="text" id="f-url" placeholder="https://..."></div></div>
@@ -344,6 +366,18 @@ function renderDevices(devices){
           <button class="btn-xs maint ${d.in_maintenance?'active':''}" onclick="toggleMaintenance('${d.id}',${d.in_maintenance})">🔧 ${d.in_maintenance?'Fin mantenimiento':'Mantenimiento'}</button>
           <button class="btn-xs del" onclick="confirmDelete('${d.id}','${d.name}')">🗑 Borrar</button>
         </div>
+        ${d.type === 'ha_switch' ? `
+        <div class="toggle-wrap">
+          <label class="toggle" title="Activar/Desactivar">
+            <input type="checkbox" id="toggle-${d.id}" ${d.switch_state === 'on' ? 'checked' : ''}
+              onchange="toggleSwitch('${d.id}', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">Protección</span>
+          <span class="toggle-status ${d.switch_state === 'on' ? 'on' : 'off'}" id="toggle-status-${d.id}">
+            ${d.switch_state === 'on' ? 'ACTIVA' : 'INACTIVA'}
+          </span>
+        </div>` : ''}
       </div></div>
     </div>`;
   }).join('');
@@ -384,6 +418,8 @@ async function loadLatency(id){
 function updateFields(){
   const t=document.getElementById('f-type').value;
   ['http','ping','port','ha'].forEach(k=>document.getElementById('fields-'+k).style.display=t===(k==='ha'?'ha_entity':k)?'':'none');
+  // ha_switch también usa el campo entity_id
+  if(t==='ha_switch') document.getElementById('fields-ha').style.display='';
 }
 function openModal(device){
   editingId=device?device.id:null;
@@ -424,6 +460,39 @@ async function editDevice(id){
 async function confirmDelete(id,name){
   if(!confirm(`¿Borrar "${name}"? Se eliminará también su historial.`))return;
   await fetch(`/api/devices/${id}`,{method:'DELETE'});refresh();
+}
+
+// Toggle switch HA
+async function toggleSwitch(id, checked){
+  const action = checked ? 'turn_on' : 'turn_off';
+  const statusEl = document.getElementById(`toggle-status-${id}`);
+  const checkbox = document.getElementById(`toggle-${id}`);
+
+  // Feedback visual inmediato
+  if(statusEl){ statusEl.textContent = checked ? 'ACTIVANDO…' : 'DESACTIVANDO…'; statusEl.className='toggle-status'; }
+
+  try {
+    const res = await fetch(`/api/toggle/${id}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({action})
+    });
+    const data = await res.json();
+    if(!data.ok){
+      // Revertir si falló
+      if(checkbox) checkbox.checked = !checked;
+      if(statusEl){ statusEl.textContent = 'ERROR'; statusEl.className='toggle-status off'; }
+      alert('Error: ' + data.message);
+    } else {
+      if(statusEl){
+        statusEl.textContent = checked ? 'ACTIVA' : 'INACTIVA';
+        statusEl.className = 'toggle-status ' + (checked ? 'on' : 'off');
+      }
+    }
+  } catch {
+    if(checkbox) checkbox.checked = !checked;
+    if(statusEl){ statusEl.textContent = 'ERROR'; statusEl.className='toggle-status off'; }
+  }
 }
 
 // Drag & Drop

@@ -98,6 +98,74 @@ def check_ha_entity(entity_id: str, timeout: int):
     return True, None, round(ms)
 
 
+def check_ha_switch(entity_id: str, timeout: int):
+    """
+    Comprueba el estado de un switch de Home Assistant.
+    Devuelve online=True si el switch está 'on' o 'off' (disponible),
+    online=False si está unavailable/unknown.
+    También devuelve el estado actual como parte del error para mostrarlo.
+    """
+    from config import HOME_ASSISTANT_TOKEN, HOME_ASSISTANT_URL
+
+    url = f"{HOME_ASSISTANT_URL.rstrip('/')}/api/states/{entity_id}"
+    headers = {
+        "Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        start = time.monotonic()
+        resp = requests.get(url, headers=headers, timeout=timeout)
+        ms = (time.monotonic() - start) * 1000
+    except requests.exceptions.ConnectTimeout:
+        return False, "Sin respuesta de Home Assistant (timeout)", None
+    except requests.exceptions.ConnectionError:
+        return False, "No se pudo conectar con Home Assistant", None
+    except requests.exceptions.RequestException as e:
+        return False, type(e).__name__, None
+
+    if resp.status_code == 401:
+        return False, "Token inválido o caducado", None
+    if resp.status_code == 404:
+        return False, f"Entidad '{entity_id}' no existe", None
+    if resp.status_code != 200:
+        return False, f"HA respondió HTTP {resp.status_code}", None
+
+    data = resp.json()
+    state = data.get("state")
+
+    if state in ("unavailable", "unknown", None):
+        return False, f"Switch en estado '{state}'", None
+
+    # El switch existe y responde — está online independientemente de on/off
+    # Devolvemos el estado actual como metadata
+    return True, state, round(ms)
+
+
+def toggle_ha_switch(entity_id: str, action: str, timeout: int = 5) -> tuple[bool, str]:
+    """
+    Activa o desactiva un switch de Home Assistant.
+    action: 'turn_on' | 'turn_off' | 'toggle'
+    Devuelve (éxito, mensaje).
+    """
+    from config import HOME_ASSISTANT_TOKEN, HOME_ASSISTANT_URL
+
+    url = f"{HOME_ASSISTANT_URL.rstrip('/')}/api/services/switch/{action}"
+    headers = {
+        "Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    payload = {"entity_id": entity_id}
+
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+        if resp.status_code in (200, 201):
+            return True, "ok"
+        return False, f"HA respondió HTTP {resp.status_code}"
+    except Exception as e:
+        return False, str(e)
+
+
 def check_device(device: dict):
     """Despacha la comprobación según el tipo de dispositivo."""
     dtype = device["type"]
@@ -110,5 +178,10 @@ def check_device(device: dict):
         return check_port(device["host"], device["port"], device.get("timeout", 5))
     if dtype == "ha_entity":
         return check_ha_entity(device["entity_id"], device.get("timeout", 5))
+    if dtype == "ha_switch":
+        online, state, ms = check_ha_switch(device["entity_id"], device.get("timeout", 5))
+        # Para ha_switch guardamos el estado (on/off) como last_error para mostrarlo
+        # online=True significa que el switch está disponible (on o off)
+        return online, state if online else state, ms
 
     return False, f"Tipo de dispositivo desconocido: {dtype}", None
