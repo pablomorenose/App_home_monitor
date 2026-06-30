@@ -1,9 +1,48 @@
 # Notas para la próxima IA
 
-## Contexto
-Esta app corre en una Raspberry Pi 4 (Debian Bookworm arm64) dentro de un contenedor Docker.
-El contenedor se arranca con acceso al socket de Docker:
-  -v /var/run/docker.sock:/var/run/docker.sock
+## Infraestructura actual — YA NO usamos fly.io
+
+La app se ha migrado completamente a una Raspberry Pi 4 local.
+fly.io queda abandonado, no hay que tocarlo ni desplegarlo ahí.
+
+### Acceso a la app
+- Red local:     http://192.168.1.119:8088
+- Internet:      https://raspberrypi.tail08d292.ts.net  (Tailscale Funnel, gratuito, HTTPS automático)
+
+### La Raspberry Pi
+- Hostname:      raspberrypi
+- Usuario:       admin
+- OS:            Debian Bookworm arm64
+- IP local:      192.168.1.119
+- Tailscale IP:  100.112.43.5
+
+### Docker
+- La app corre en un contenedor llamado "home-monitor"
+- Puerto: 8088
+- El contenedor tiene acceso al socket de Docker para monitorización:
+    -v /var/run/docker.sock:/var/run/docker.sock
+- Tiene --restart unless-stopped (arranca solo al reiniciar la Pi)
+- Las variables de entorno están en /home/admin/Home_Monitor/.env (NO está en GitHub)
+
+### Auto-update
+- Hay un cron cada 5 minutos que hace git pull y reconstruye la imagen si hay cambios
+- Script: /home/admin/Home_Monitor/auto-update.sh
+- Log: /home/admin/home-monitor-update.log
+- Por tanto: cuando hagas git push, en menos de 5 minutos la Pi se actualiza sola
+
+### Variables de entorno necesarias (.env)
+- DATABASE_URL       — Supabase PostgreSQL (pooler)
+- DB_HOST            — aws-1-eu-central-1.pooler.supabase.com
+- DB_PORT            — 6543
+- DB_NAME            — postgres
+- DB_USER            — postgres.fjyckjfrbpsneyhkrvsj
+- DB_PASSWORD        — (en el .env de la Pi)
+- HOME_ASSISTANT_URL — https://antediluvian.tplinkdns.com
+- HOME_ASSISTANT_TOKEN — (token largo de Home Assistant)
+- CHECK_INTERVAL_SECONDS — 15
+- VAPID_PRIVATE_KEY  — (generada en la Pi)
+- VAPID_PUBLIC_KEY   — (generada en la Pi)
+- VAPID_CLAIMS_EMAIL — admin@home-monitor.local
 
 ---
 
@@ -20,24 +59,23 @@ El contenedor se arranca con acceso al socket de Docker:
 - LED rojo si el contenedor está caído
 - Mismo aspecto visual que el resto de tarjetas: LED, colapsar, arrastrar
 - Los datos también vienen de /api/pi-stats, sección "docker"
-- La RAM del Docker muestra "n/a" hasta que se reinicie la Pi (se han habilitado
-  los cgroups de memoria en /boot/firmware/cmdline.txt, necesita reboot para aplicar)
+- La RAM del Docker muestra "n/a" hasta que se reinicie la Pi (cgroups de memoria
+  habilitados en /boot/firmware/cmdline.txt, necesita reboot para aplicar)
 
 ---
 
 ## Lo que hay que hacer cuando actualices al diseño nuevo
 
-La versión en fly.io (https://home-monitor-sandra.fly.dev) tiene un diseño nuevo
-con aspecto cristal e iconos nuevos que NO está en GitHub todavía.
+La versión con diseño nuevo (aspecto cristal, iconos nuevos) NO está en GitHub todavía.
+El usuario la subirá desde su otro ordenador.
 
-Cuando el usuario suba esa versión nueva a GitHub, hay que:
-
-1. Hacer git pull para tener la versión nueva
-2. Portar el endpoint /api/pi-stats de app.py (está completo en la rama main)
-3. Añadir las dos tarjetas en el nuevo index.html con el nuevo diseño visual
-   manteniendo la misma funcionalidad: LED, colapsar, arrastrar, barras de progreso
-4. El JS necesario está en la función loadPiStats() y toggleSysCard() del index.html actual
-5. El contenedor necesita el flag: -v /var/run/docker.sock:/var/run/docker.sock
+Cuando llegue ese push, hay que:
+1. Portar el endpoint /api/pi-stats de app.py (está completo en rama main)
+2. Añadir las dos tarjetas en el nuevo index.html con el nuevo diseño visual
+   manteniendo: LED, colapsar, arrastrar, barras de progreso
+3. El JS necesario está en loadPiStats() y toggleSysCard() del index.html actual
+4. Asegurarse de que el contenedor sigue arrancando con:
+   -v /var/run/docker.sock:/var/run/docker.sock
 
 ---
 
