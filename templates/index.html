@@ -362,47 +362,6 @@
 
   <div class="device-list" id="device-list"></div>
 
-  <!-- Tarjetas sistema — mismo estilo que device-row -->
-  <div id="sys-device-list" style="display:flex;flex-direction:column;gap:7px;margin-top:7px;">
-
-    <div class="device-row" id="sys-pi-row" draggable="true" data-id="sys-pi">
-      <div class="device-header" onclick="toggleSysCard('sys-pi-row')">
-        <div class="led on" id="sys-pi-led"></div>
-        <div class="device-name-row">
-          <span class="device-name">Raspberry Pi</span>
-          <span class="status-inline up" id="sys-pi-status">Online</span>
-        </div>
-        <div class="collapse-btn" id="sys-pi-arrow">▾</div>
-        <div class="drag-handle" id="sys-pi-drag">⠿</div>
-      </div>
-      <div class="device-body" id="sys-pi-body"><div class="device-body-inner">
-        <div class="device-body-content">
-          <div class="device-left" id="pi-metrics"><span class="device-meta">Cargando…</span></div>
-          <div class="device-right" id="pi-uptime" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);"></div>
-        </div>
-      </div></div>
-    </div>
-
-    <div class="device-row" id="sys-docker-row" draggable="true" data-id="sys-docker">
-      <div class="device-header" onclick="toggleSysCard('sys-docker-row')">
-        <div class="led on" id="sys-docker-led"></div>
-        <div class="device-name-row">
-          <span class="device-name">Docker / Home Monitor</span>
-          <span class="status-inline up" id="sys-docker-status">Running</span>
-        </div>
-        <div class="collapse-btn" id="sys-docker-arrow">▾</div>
-        <div class="drag-handle">⠿</div>
-      </div>
-      <div class="device-body" id="sys-docker-body"><div class="device-body-inner">
-        <div class="device-body-content">
-          <div class="device-left" id="docker-metrics"><span class="device-meta">Cargando…</span></div>
-          <div class="device-right"></div>
-        </div>
-      </div></div>
-    </div>
-
-  </div>
-
   <footer id="footer-note">Comprobando conexión…</footer>
 </div>
 
@@ -835,7 +794,7 @@ async function refresh(){
   }catch{document.getElementById('footer-note').textContent='Sin conexion. Reintentando…';}
 }
 refresh();setInterval(refresh,REFRESH_MS);
-setInterval(loadPiStats, 15000); loadPiStats();
+setInterval(loadPiStats, 15000); loadPiStats(); applySysCollapsedState();
 
 function toggleSysCard(rowId){
   const row=document.getElementById(rowId);
@@ -897,10 +856,27 @@ async function loadPiStats(){
   }catch{}
 }
 
-// Plegar/desplegar tarjetas de sistema (Pi/Docker)
+// Plegar/desplegar tarjetas de sistema (Pi/Docker) — estado memorizado
+const SYS_COLLAPSED_KEY='homem_sys_collapsed';
+function loadSysCollapsed(){try{return JSON.parse(localStorage.getItem(SYS_COLLAPSED_KEY))||{};}catch{return{};}}
+function saveSysCollapsed(m){localStorage.setItem(SYS_COLLAPSED_KEY,JSON.stringify(m));}
+function applySysCollapsedState(){
+  // Por defecto aparecen PLEGADAS; si el usuario las desplegó, se respeta.
+  const m=loadSysCollapsed();
+  ['sys-pi-row','sys-docker-row'].forEach(id=>{
+    const r=document.getElementById(id);
+    if(!r)return;
+    const collapsed=(typeof m[id]==='boolean')?m[id]:true;
+    r.classList.toggle('collapsed',collapsed);
+  });
+}
 function toggleSysCard(rowId){
   const r=document.getElementById(rowId);
-  if(r)r.classList.toggle('collapsed');
+  if(!r)return;
+  const isNowCollapsed=r.classList.toggle('collapsed');
+  const m=loadSysCollapsed();
+  m[rowId]=isNowCollapsed;
+  saveSysCollapsed(m);
 }
 
 // Push
