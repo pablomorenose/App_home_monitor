@@ -136,6 +136,173 @@ def api_toggle(device_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/pi-stats")
+def api_pi_stats():
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    import subprocess, shutil
+
+    # --- CPU % (media 1s) ---
+    try:
+        with open("/proc/stat") as f:
+            line1 = f.readline().split()
+        time.sleep(0.5)
+        with open("/proc/stat") as f:
+            line2 = f.readline().split()
+        idle1 = int(line1[4]); total1 = sum(int(x) for x in line1[1:])
+        idle2 = int(line2[4]); total2 = sum(int(x) for x in line2[1:])
+        cpu_pct = round(100 * (1 - (idle2 - idle1) / (total2 - total1)), 1)
+    except Exception:
+        cpu_pct = None
+
+    # --- RAM ---
+    try:
+        mem = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                k, v = line.split(":"); mem[k.strip()] = int(v.split()[0])
+        ram_total_mb = mem["MemTotal"] // 1024
+        ram_avail_mb = mem["MemAvailable"] // 1024
+        ram_used_mb  = ram_total_mb - ram_avail_mb
+        ram_pct      = round(100 * ram_used_mb / ram_total_mb, 1)
+    except Exception:
+        ram_total_mb = ram_used_mb = ram_avail_mb = ram_pct = None
+
+    # --- Temperatura ---
+    try:
+        result = subprocess.run(["vcgencmd", "measure_temp"], capture_output=True, text=True, timeout=2)
+        temp_str = result.stdout.strip().replace("temp=", "").replace("'C", "")
+        temp_c = float(temp_str)
+    except Exception:
+        try:
+            with open("/sys/class/thermal/thermal_zone0/temp") as f:
+                temp_c = round(int(f.read().strip()) / 1000, 1)
+        except Exception:
+            temp_c = None
+
+    # --- Disco ---
+    try:
+        disk = shutil.disk_usage("/")
+        disk_total_gb = round(disk.total / 1e9, 1)
+        disk_used_gb  = round(disk.used  / 1e9, 1)
+        disk_free_gb  = round(disk.free  / 1e9, 1)
+        disk_pct      = round(100 * disk.used / disk.total, 1)
+    except Exception:
+        disk_total_gb = disk_used_gb = disk_free_gb = disk_pct = None
+
+    # --- Uptime ---
+    try:
+        with open("/proc/uptime") as f:
+            uptime_secs = int(float(f.read().split()[0]))
+        days, rem = divmod(uptime_secs, 86400)
+        hours, rem = divmod(rem, 3600)
+        mins = rem // 60
+        uptime_human = (f"{days}d " if days else "") + f"{hours}h {mins}min"
+    except Exception:
+        uptime_human = None
+
+    # --- Docker container stats ---
+    docker_stats = None
+    try:
+        import socket as sock
+        import json as _json
+
+        def docker_get(path):
+            s = sock.socket(sock.AF_UNIX, sock.SOCK_STREAM)
+            s.connect("/var/run/docker.sock")
+            req = f"GET {path} HTTP/1.0\r\nHost: localhost\r\n\r\n"
+            s.sendall(req.encode())
+            resp = b""
+            while True:
+                chunk = s.recv(4096)
+                if not chunk:
+                    break
+                resp += chunk
+            s.close()
+            body = resp.split(b"\r\n\r\n", 1)[1]
+            return _json.loads(body)
+
+        # Inspect container
+        info = docker_get("/containers/home-monitor/json")
+        status = info.get("State", {}).get("Status", "unknown")
+
+        # Stats (no-stream via ?stream=false)
+        def docker_get_stats(path):
+            s = sock.socket(sock.AF_UNIX, sock.SOCK_STREAM)
+            s.connect("/var/run/docker.sock")
+            req = f"GET {path} HTTP/1.0\r\nHost: localhost\r\n\r\n"
+            s.sendall(req.encode())
+            resp = b""
+            while True:
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                resp += chunk
+            s.close()
+            body = resp.split(b"\r\n\r\n", 1)[1]
+            return _json.loads(body)
+
+        st = docker_get_stats("/containers/home-monitor/stats?stream=false")
+
+        # CPU %
+        cpu_delta = st["cpu_stats"]["cpu_usage"]["total_usage"] - st["precpu_stats"]["cpu_usage"]["total_usage"]
+        sys_delta  = st["cpu_stats"]["system_cpu_usage"] - st["precpu_stats"]["system_cpu_usage"]
+        num_cpus   = st["cpu_stats"].get("online_cpus", len(st["cpu_stats"]["cpu_usage"].get("percpu_usage", [1])))
+        docker_cpu = round(cpu_delta / sys_delta * num_cpus * 100, 1) if sys_delta > 0 else 0.0
+
+        # RAM — fallback a /proc si cgroups no disponibles
+        mem_usage_raw = st["memory_stats"].get("usage")
+        if mem_usage_raw:
+            mem_usage = mem_usage_raw - st["memory_stats"].get("stats", {}).get("cache", 0)
+            mem_limit = st["memory_stats"]["limit"]
+            docker_mem_mb    = round(mem_usage / 1048576, 1)
+            docker_mem_limit = round(mem_limit  / 1048576, 1)
+            mem_str = f"{docker_mem_mb}MB / {docker_mem_limit}MB"
+        else:
+            # Raspberry Pi sin memory cgroup: leer desde /proc del proceso principal
+            pid = info.get("State", {}).get("Pid", 0)
+            try:
+                with open(f"/proc/{pid}/status") as f:
+                    for line in f:
+                        if line.startswith("VmRSS:"):
+                            rss_kb = int(line.split()[1])
+                            mem_str = f"{round(rss_kb/1024,1)}MB"
+                            break
+                    else:
+                        mem_str = "n/a"
+            except Exception:
+                mem_str = "n/a"
+
+        # Network
+        net_rx = sum(v["rx_bytes"] for v in st.get("networks", {}).values())
+        net_tx = sum(v["tx_bytes"] for v in st.get("networks", {}).values())
+        def fmt_bytes(b):
+            return f"{round(b/1048576,1)}MB" if b >= 1048576 else f"{round(b/1024,1)}kB"
+
+        docker_stats = {
+            "status": status,
+            "cpu": f"{docker_cpu}%",
+            "mem": mem_str,
+            "net": f"↓{fmt_bytes(net_rx)} ↑{fmt_bytes(net_tx)}",
+        }
+    except Exception:
+        docker_stats = {"status": "unknown"}
+
+    return jsonify({
+        "cpu_pct": cpu_pct,
+        "ram_total_mb": ram_total_mb,
+        "ram_used_mb": ram_used_mb,
+        "ram_avail_mb": ram_avail_mb,
+        "ram_pct": ram_pct,
+        "temp_c": temp_c,
+        "disk_total_gb": disk_total_gb,
+        "disk_used_gb": disk_used_gb,
+        "disk_free_gb": disk_free_gb,
+        "disk_pct": disk_pct,
+        "uptime": uptime_human,
+        "docker": docker_stats,
+    })
+
+
 @app.route("/api/ha-sensors")
 def api_ha_sensors():
     if require_auth(): return jsonify({"error": "No autorizado"}), 401

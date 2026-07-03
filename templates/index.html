@@ -237,6 +237,14 @@
   footer{margin-top:32px;text-align:center;font-size:11px;color:var(--text-dim);font-family:var(--mono);}
 
   @media(min-width:521px){.clock{display:block;}}
+
+  /* ── Barras sistema (tarjetas Pi / Docker) ── */
+  .sys-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .sys-label{font-family:var(--mono);font-size:10px;color:var(--text-dim);width:42px;flex-shrink:0;text-transform:uppercase;letter-spacing:.05em;}
+  .sys-bar-wrap{flex:1;height:4px;background:var(--track);border-radius:999px;overflow:hidden;}
+  .sys-bar{height:100%;border-radius:999px;transition:width .6s;}
+  .sys-val{font-family:var(--mono);font-size:10px;font-weight:600;width:46px;text-align:right;flex-shrink:0;}
+
   @media(max-width:520px){
     header{gap:8px;}
     h1{font-size:26px;}
@@ -316,7 +324,85 @@
     </div>
   </header>
   <div class="summary-bar" id="summary-bar"><div class="chip"><span class="dot"></span>Cargando…</div></div>
+  <!-- Tarjetas de sistema: Raspberry Pi + Docker (estáticas, datos de /api/pi-stats) -->
+  <div class="device-list" id="sys-list" style="margin-bottom:12px">
+    <!-- Raspberry Pi -->
+    <div class="device-row" id="sys-pi-row" draggable="true" data-id="sys-pi">
+      <div class="device-header" onclick="toggleSysCard('sys-pi-row')">
+        <div class="led on" id="sys-pi-led"></div>
+        <div class="device-name-row"><span class="device-name">Raspberry Pi</span></div>
+        <span class="status-pill up" id="sys-pi-status">Online</span>
+        <span class="collapse-btn" id="sys-pi-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+        <span class="drag-handle"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>
+      </div>
+      <div class="device-body"><div class="device-body-inner">
+        <div class="device-body-content">
+          <div class="device-left" id="pi-metrics"><div class="since-row">Cargando…</div></div>
+          <div class="device-right" id="pi-uptime" style="text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--text-dim)"></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Docker / Home Monitor -->
+    <div class="device-row" id="sys-docker-row" draggable="true" data-id="sys-docker">
+      <div class="device-header" onclick="toggleSysCard('sys-docker-row')">
+        <div class="led on" id="sys-docker-led"></div>
+        <div class="device-name-row"><span class="device-name">Docker · Home Monitor</span></div>
+        <span class="status-pill up" id="sys-docker-status">Running</span>
+        <span class="collapse-btn" id="sys-docker-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+        <span class="drag-handle"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>
+      </div>
+      <div class="device-body"><div class="device-body-inner">
+        <div class="device-body-content">
+          <div class="device-left" id="docker-metrics"><div class="since-row">Cargando…</div></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
   <div class="device-list" id="device-list"></div>
+
+  <!-- Tarjetas sistema — mismo estilo que device-row -->
+  <div id="sys-device-list" style="display:flex;flex-direction:column;gap:7px;margin-top:7px;">
+
+    <div class="device-row" id="sys-pi-row" draggable="true" data-id="sys-pi">
+      <div class="device-header" onclick="toggleSysCard('sys-pi-row')">
+        <div class="led on" id="sys-pi-led"></div>
+        <div class="device-name-row">
+          <span class="device-name">Raspberry Pi</span>
+          <span class="status-inline up" id="sys-pi-status">Online</span>
+        </div>
+        <div class="collapse-btn" id="sys-pi-arrow">▾</div>
+        <div class="drag-handle" id="sys-pi-drag">⠿</div>
+      </div>
+      <div class="device-body" id="sys-pi-body"><div class="device-body-inner">
+        <div class="device-body-content">
+          <div class="device-left" id="pi-metrics"><span class="device-meta">Cargando…</span></div>
+          <div class="device-right" id="pi-uptime" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);"></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="device-row" id="sys-docker-row" draggable="true" data-id="sys-docker">
+      <div class="device-header" onclick="toggleSysCard('sys-docker-row')">
+        <div class="led on" id="sys-docker-led"></div>
+        <div class="device-name-row">
+          <span class="device-name">Docker / Home Monitor</span>
+          <span class="status-inline up" id="sys-docker-status">Running</span>
+        </div>
+        <div class="collapse-btn" id="sys-docker-arrow">▾</div>
+        <div class="drag-handle">⠿</div>
+      </div>
+      <div class="device-body" id="sys-docker-body"><div class="device-body-inner">
+        <div class="device-body-content">
+          <div class="device-left" id="docker-metrics"><span class="device-meta">Cargando…</span></div>
+          <div class="device-right"></div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+
   <footer id="footer-note">Comprobando conexión…</footer>
 </div>
 
@@ -749,6 +835,73 @@ async function refresh(){
   }catch{document.getElementById('footer-note').textContent='Sin conexion. Reintentando…';}
 }
 refresh();setInterval(refresh,REFRESH_MS);
+setInterval(loadPiStats, 15000); loadPiStats();
+
+function toggleSysCard(rowId){
+  const row=document.getElementById(rowId);
+  if(row) row.classList.toggle('collapsed');
+}
+
+// Drag & drop para tarjetas sistema
+(function(){
+  const list=document.getElementById('sys-device-list');
+  if(!list)return;
+  let dragged=null;
+  list.querySelectorAll('.device-row').forEach(row=>{
+    row.addEventListener('dragstart',e=>{if(!e.target.closest('.drag-handle')){e.preventDefault();return;}dragged=row;setTimeout(()=>row.classList.add('dragging'),0);});
+    row.addEventListener('dragend',()=>{row.classList.remove('dragging');list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));});
+    row.addEventListener('dragover',e=>{e.preventDefault();if(row!==dragged){list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));row.classList.add('drag-over');}});
+    row.addEventListener('drop',e=>{e.preventDefault();if(row!==dragged){const all=[...list.querySelectorAll('.device-row')];all.indexOf(dragged)<all.indexOf(row)?row.after(dragged):row.before(dragged);}});
+  });
+})();
+
+async function loadPiStats(){
+  try{
+    const d=await(await fetch('/api/pi-stats')).json();
+
+    // --- Raspberry Pi card ---
+    const piEl=document.getElementById('pi-metrics');
+    const piUp=document.getElementById('pi-uptime');
+    if(piEl){
+      const tempColor = d.temp_c==null?'var(--green)':d.temp_c<70?'var(--green)':d.temp_c<80?'var(--amber)':'var(--red)';
+      const cpuColor  = d.cpu_pct==null?'var(--green)':d.cpu_pct<70?'var(--green)':d.cpu_pct<90?'var(--amber)':'var(--red)';
+      const ramColor  = d.ram_pct==null?'var(--green)':d.ram_pct<70?'var(--green)':d.ram_pct<90?'var(--amber)':'var(--red)';
+      const diskColor = d.disk_pct==null?'var(--green)':d.disk_pct<80?'var(--green)':d.disk_pct<95?'var(--amber)':'var(--red)';
+      piEl.innerHTML=`
+        <div class="sys-row"><span class="sys-label">CPU</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.cpu_pct??0}%;background:${cpuColor}"></div></div><span class="sys-val" style="color:${cpuColor}">${d.cpu_pct!=null?d.cpu_pct+'%':'—'}</span></div>
+        <div class="sys-row"><span class="sys-label">RAM</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.ram_pct??0}%;background:${ramColor}"></div></div><span class="sys-val" style="color:${ramColor}">${d.ram_pct!=null?d.ram_pct+'%':'—'}</span></div>
+        <div class="sys-row"><span class="sys-label">Temp</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.temp_c!=null?Math.min(d.temp_c,100):0}%;background:${tempColor}"></div></div><span class="sys-val" style="color:${tempColor}">${d.temp_c!=null?d.temp_c+'°C':'—'}</span></div>
+        <div class="sys-row"><span class="sys-label">Disco</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.disk_pct??0}%;background:${diskColor}"></div></div><span class="sys-val" style="color:${diskColor}">${d.disk_pct!=null?d.disk_pct+'%':'—'}</span></div>
+        <div class="since-row" style="margin-top:6px">${d.ram_used_mb!=null?`RAM ${d.ram_used_mb}/${d.ram_total_mb} MB · `:''}${d.disk_used_gb!=null?`Disco ${d.disk_used_gb}/${d.disk_total_gb} GB`:''}</div>
+      `;
+    }
+    if(piUp && d.uptime) piUp.innerHTML=`<div>Uptime</div><div style="font-weight:600;color:var(--text);margin-top:2px">${d.uptime}</div>`;
+
+    // --- Docker card ---
+    const dkEl=document.getElementById('docker-metrics');
+    const dkLed=document.getElementById('sys-docker-led');
+    const dkStatus=document.getElementById('sys-docker-status');
+    const dkRow=document.getElementById('sys-docker-row');
+    if(dkEl && d.docker){
+      const dk=d.docker;
+      const running=dk.status==='running';
+      if(dkLed){dkLed.className='led '+(running?'on':'off');}
+      if(dkStatus){dkStatus.className='status-pill '+(running?'up':'down');dkStatus.textContent=running?'Running':'Stopped';}
+      if(dkRow){dkRow.classList.toggle('is-down',!running);}
+      dkEl.innerHTML=running?`
+        <div class="sys-row"><span class="sys-label">CPU</span><span class="sys-val" style="color:var(--text);font-weight:600;width:auto">${dk.cpu}</span></div>
+        <div class="sys-row"><span class="sys-label">RAM</span><span class="sys-val" style="color:var(--text);width:auto">${dk.mem}</span></div>
+        <div class="sys-row"><span class="sys-label">Red</span><span class="sys-val" style="color:var(--text-dim);width:auto">${dk.net}</span></div>
+      `:`<div class="since-row" style="color:var(--red)">Contenedor detenido</div>`;
+    }
+  }catch{}
+}
+
+// Plegar/desplegar tarjetas de sistema (Pi/Docker)
+function toggleSysCard(rowId){
+  const r=document.getElementById(rowId);
+  if(r)r.classList.toggle('collapsed');
+}
 
 // Push
 let swReg=null;
