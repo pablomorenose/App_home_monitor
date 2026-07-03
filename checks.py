@@ -179,9 +179,8 @@ def check_device(device: dict):
     if dtype == "ha_entity":
         return check_ha_entity(device["entity_id"], device.get("timeout", 5))
     if dtype == "ha_switch":
+        # online = el switch está disponible (on/off). switch_state va como metadata.
         online, state, ms = check_ha_switch(device["entity_id"], device.get("timeout", 5))
-        # Para ha_switch guardamos el estado (on/off) como last_error para mostrarlo
-        # online=True significa que el switch está disponible (on o off)
-        return online, state if online else state, ms
+        return online, state, ms
 
     return False, f"Tipo de dispositivo desconocido: {dtype}", None

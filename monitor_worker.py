@@ -20,9 +20,19 @@ def run_checks_once():
     prev = {s["device_id"]: bool(s["online"]) for s in get_all_statuses()}
 
     def _check(device):
-        online, error, response_ms = check_device(device)
-        update_status(device["id"], device["name"], online, error, response_ms)
-        return device, online, error
+        online, info, response_ms = check_device(device)
+        if device["type"] == "ha_switch":
+            # `info` es el estado del switch ("on"/"off") cuando está online,
+            # o el mensaje de error cuando está offline.
+            if online:
+                update_status(device["id"], device["name"], True, None,
+                              response_ms, switch_state=info)
+                return device, True, None
+            update_status(device["id"], device["name"], False, info,
+                          response_ms, switch_state=None)
+            return device, False, info
+        update_status(device["id"], device["name"], online, info, response_ms)
+        return device, online, info
 
     with ThreadPoolExecutor(max_workers=len(devices) or 1) as ex:
         futures = {ex.submit(_check, d): d for d in devices}

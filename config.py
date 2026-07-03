@@ -102,4 +102,11 @@ DEVICES = [
         "entity_id": "camera.sonoff4",
         "timeout": 8,
     },
+    {
+        "id": "adguard",
+        "name": "AdGuard Home",
+        "type": "ha_switch",
+        "entity_id": "switch.adguard_home_proteccion",
+        "timeout": 8,
+    },
 ]

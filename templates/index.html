@@ -2,236 +2,328 @@
 <html lang="es" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>HomeM</title>
 <link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#0b0e0d">
+<meta name="theme-color" content="#0e0f13" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="HomeM">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 <style>
-  /* ── Temas ── */
-  :root {
-    --bg:#0b0e0d;--panel:#111513;--panel-border:#1f2723;
-    --text-primary:#e7ece9;--text-dim:#6f7d76;
-    --green:#3ddc84;--green-glow:rgba(61,220,132,.35);
-    --red:#ff5c5c;--red-glow:rgba(255,92,92,.35);
-    --amber:#ffb454;--blue:#5b9cf6;
-    --mono:"IBM Plex Mono","SF Mono",Consolas,monospace;
-    --sans:"Inter",-apple-system,sans-serif;
+  /* ─────────── Sistema de diseño cristal iOS-Revolut ─────────── */
+  :root{
+    --accent:#0a84ff;--accent-light:#5ac8fa;
+    --green:#34c759;--red:#ff3b30;--amber:#ff9500;
+    --surface:#0e0f13;
+    --text:#f5f5f7;--text-dim:#98989d;--text-tertiary:#636366;
+    --card-bg:rgba(255,255,255,.06);
+    --card-ring:rgba(255,255,255,.10);
+    --card-shadow:0 2px 8px rgba(0,0,0,.3),0 8px 28px rgba(0,0,0,.35);
+    --track:rgba(255,255,255,.08);
+    --overlay:rgba(0,0,0,.55);
+    --sheet:#1c1e26;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Inter,sans-serif;
+    --mono:"SF Mono",ui-monospace,"IBM Plex Mono",Consolas,monospace;
   }
-  [data-theme="light"] {
-    --bg:#f4f6f5;--panel:#ffffff;--panel-border:#dde3e0;
-    --text-primary:#1a1f1d;--text-dim:#7a8a82;
-    --green:#1a9e57;--green-glow:rgba(26,158,87,.2);
-    --red:#d63b3b;--red-glow:rgba(214,59,59,.2);
-    --amber:#b87d00;--blue:#2563eb;
+  [data-theme="light"]{
+    --surface:#f5f6f8;
+    --text:#1c1c1e;--text-dim:#6e6e73;--text-tertiary:#aeaeb2;
+    --card-bg:rgba(255,255,255,.82);
+    --card-ring:rgba(0,0,0,.05);
+    --card-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06);
+    --track:rgba(0,0,0,.06);
+    --overlay:rgba(0,0,0,.30);
+    --sheet:#ffffff;
   }
-  *{box-sizing:border-box;}
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
   body{
-    margin:0;background:var(--bg);
-    background-image:radial-gradient(circle at 15% 0%,rgba(61,220,132,.04),transparent 40%);
-    color:var(--text-primary);font-family:var(--sans);
-    min-height:100vh;padding:24px 16px 60px;
+    background:var(--surface);
+    background-image:
+      radial-gradient(circle at 15% -5%,color-mix(in srgb,var(--accent) 16%,transparent),transparent 45%),
+      radial-gradient(circle at 90% 0%,color-mix(in srgb,var(--accent-light) 11%,transparent),transparent 40%);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+    letter-spacing:-.01em;
+    min-height:100dvh;
+    padding:max(96px,env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom));
     transition:background .3s,color .3s;
   }
-  .wrap{max-width:860px;margin:0 auto;}
+  .wrap{max-width:520px;margin:0 auto;}
 
-  /* ── Header ── */
-  header{
-    display:flex;justify-content:space-between;align-items:center;
-    border-bottom:1px solid var(--panel-border);padding-bottom:14px;margin-bottom:20px;gap:8px;
+  /* ── Header estilo Revolut: título grande + botones circulares sin color ── */
+  header{display:flex;justify-content:space-between;align-items:center;margin:0 auto 28px;gap:10px;}
+  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);margin-bottom:2px;}
+  h1{font-size:30px;font-weight:700;margin:0;letter-spacing:-.03em;}
+  .header-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .clock{font-family:var(--mono);font-size:11px;color:var(--text-dim);font-variant-numeric:tabular-nums;display:none;}
+
+  /* Botones circulares translúcidos SIN color (estilo finanzas) */
+  .icon-btn{
+    width:38px;height:38px;border-radius:999px;
+    background:var(--card-bg);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--card-ring);
+    box-shadow:var(--card-shadow);
+    color:var(--text);
+    display:inline-flex;align-items:center;justify-content:center;
+    cursor:pointer;text-decoration:none;
+    transition:transform .12s,opacity .12s;
   }
-  .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;
-    text-transform:uppercase;color:var(--text-dim);margin-bottom:3px;}
-  h1{font-size:19px;font-weight:650;margin:0;}
-  .header-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-  .clock{font-family:var(--mono);font-size:12px;color:var(--text-dim);}
+  .icon-btn:active{transform:scale(.88);opacity:.6;}
+  .icon-btn svg{width:19px;height:19px;stroke:currentColor;fill:none;}
+  .icon-btn.active{color:var(--red);}
 
-  /* ── Botones ── */
-  .btn{
-    background:none;border:1px solid var(--panel-border);border-radius:6px;
-    color:var(--text-dim);font-family:var(--mono);font-size:11px;
-    padding:4px 9px;cursor:pointer;
-    transition:border-color .2s,color .2s,background .2s;white-space:nowrap;
-    text-decoration:none;display:inline-flex;align-items:center;gap:4px;
+  /* ── Summary chips ── */
+  .summary-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .chip{
+    padding:6px 13px;border-radius:999px;
+    background:var(--card-bg);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--card-ring);
+    box-shadow:var(--card-shadow);
+    color:var(--text-dim);font-size:12px;font-weight:600;
+    display:inline-flex;align-items:center;gap:6px;
   }
-  .btn:hover{border-color:var(--green);color:var(--green);}
-  .btn.add{border-color:var(--blue);color:var(--blue);font-size:15px;padding:2px 9px;}
-  .btn.add:hover{background:rgba(91,156,246,.08);}
-  .btn.notif-on{border-color:var(--red);color:var(--red);background:rgba(255,92,92,.08);}
-  .btn.theme-btn{font-size:14px;padding:3px 8px;}
-</style>
-<style>
-  /* ── Summary ── */
-  .summary-bar{display:flex;gap:8px;margin-bottom:16px;font-family:var(--mono);font-size:11px;flex-wrap:wrap;}
-  .chip{padding:4px 10px;border-radius:4px;border:1px solid var(--panel-border);background:var(--panel);color:var(--text-dim);}
-  .chip.alert{border-color:rgba(255,92,92,.4);color:var(--red);background:rgba(255,92,92,.06);}
+  .chip.alert{
+    color:var(--red);
+    background:color-mix(in srgb,var(--red) 16%,transparent);
+    border-color:color-mix(in srgb,var(--red) 30%,transparent);
+  }
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--green);}
+  .chip.alert .dot{background:var(--red);}
 
-  /* ── Device list ── */
-  .device-list{display:flex;flex-direction:column;gap:7px;}
+  /* ─────────── Card de dispositivo (glassmorphism) ─────────── */
+  .device-list{display:flex;flex-direction:column;gap:12px;}
   .device-row{
-    background:var(--panel);border:1px solid var(--panel-border);border-radius:8px;
-    transition:border-color .3s,opacity .2s,transform .2s;
-    user-select:none;-webkit-user-select:none;overflow:hidden;
+    background:var(--card-bg);
+    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    border:1px solid var(--card-ring);
+    border-radius:22px;
+    box-shadow:var(--card-shadow);
+    overflow:hidden;
+    transition:opacity .2s,transform .2s,border-color .25s;
+    user-select:none;-webkit-user-select:none;
   }
-  .device-row.is-down{border-color:rgba(255,92,92,.4);}
+  .device-row.is-down{border-color:color-mix(in srgb,var(--red) 40%,transparent);}
+  .device-row.protection-off{border-color:color-mix(in srgb,var(--amber) 38%,transparent);}
   .device-row.dragging{opacity:.4;}
-  .device-row.drag-over{border-color:var(--green);transform:scale(1.01);}
+  .device-row.drag-over{transform:scale(1.015);border-color:var(--accent);}
 
-  /* ── Device header (compacto) ── */
+  /* ── Fila 1: cabecera (LED + nombre + estado) ── */
   .device-header{
-    display:grid;grid-template-columns:18px 1fr auto 20px;
-    align-items:center;gap:10px;padding:10px 14px;
-    cursor:pointer;-webkit-tap-highlight-color:transparent;
+    display:flex;align-items:center;gap:12px;padding:15px 17px;
+    cursor:pointer;
   }
-  .device-header:active{background:rgba(128,128,128,.04);}
-  .led{width:10px;height:10px;border-radius:50%;background:var(--text-dim);margin:0 auto;flex-shrink:0;}
-  .led.on{background:var(--green);box-shadow:0 0 7px 2px var(--green-glow);}
-  .led.off{background:var(--red);box-shadow:0 0 7px 2px var(--red-glow);animation:pulse 1.6s ease-in-out infinite;}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-  .device-name-row{display:flex;align-items:baseline;gap:8px;min-width:0;}
-  .device-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .status-inline{font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;flex-shrink:0;}
-  .status-inline.up{color:var(--green);}
-  .status-inline.down{color:var(--red);}
-  .collapse-btn{color:var(--text-dim);font-size:12px;display:flex;align-items:center;justify-content:center;transition:transform .25s;}
+  .device-header:active{background:color-mix(in srgb,var(--text) 3%,transparent);}
+  .led{width:11px;height:11px;border-radius:50%;background:var(--text-tertiary);flex-shrink:0;transition:background .3s;}
+  .led.on{background:var(--green);box-shadow:0 0 8px 2px color-mix(in srgb,var(--green) 55%,transparent);}
+  .led.off{background:var(--red);box-shadow:0 0 8px 2px color-mix(in srgb,var(--red) 55%,transparent);animation:pulse 1.6s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+  .device-name-row{display:flex;align-items:center;gap:8px;min-width:0;flex:1;}
+  .device-name{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.015em;}
+  .badge-maint{font-size:10px;font-weight:600;color:var(--amber);
+    border:1px solid color-mix(in srgb,var(--amber) 35%,transparent);
+    background:color-mix(in srgb,var(--amber) 12%,transparent);
+    border-radius:999px;padding:2px 8px;flex-shrink:0;}
+  .status-pill{font-size:11px;font-weight:600;flex-shrink:0;padding:2px 9px;border-radius:999px;}
+  .status-pill.up{color:var(--green);background:color-mix(in srgb,var(--green) 14%,transparent);}
+  .status-pill.down{color:var(--red);background:color-mix(in srgb,var(--red) 14%,transparent);}
+  .collapse-btn{color:var(--text-dim);flex-shrink:0;transition:transform .25s;display:flex;}
+  .collapse-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;}
   .device-row.collapsed .collapse-btn{transform:rotate(-90deg);}
-  .drag-handle{color:var(--text-dim);font-size:14px;cursor:grab;touch-action:none;display:flex;align-items:center;justify-content:center;border-radius:4px;}
-  .drag-handle:active{cursor:grabbing;color:var(--green);}
+  .drag-handle{color:var(--text-dim);cursor:grab;touch-action:none;flex-shrink:0;opacity:.5;display:flex;}
+  .drag-handle:active{cursor:grabbing;opacity:1;color:var(--accent);}
+  .drag-handle svg{width:16px;height:16px;fill:currentColor;}
 
-  /* ── Device body ── */
-  .device-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .25s;overflow:hidden;}
-  .device-row.collapsed .device-body{grid-template-rows:0fr;}
-  .device-body-inner{min-height:0;padding:0 14px;transition:padding .25s;}
-  .device-row.collapsed .device-body-inner{padding-top:0;padding-bottom:0;}
-  .device-body-content{
-    border-top:1px solid var(--panel-border);padding:8px 0 6px;
-    display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;
+  /* ─────────── Fila PROTECCIÓN (AdGuard) — SIEMPRE visible ─────────── */
+  .switch-row{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:13px 17px;
+    border-top:1px solid color-mix(in srgb,var(--text) 7%,transparent);
+    background:color-mix(in srgb,var(--text) 2%,transparent);
   }
-  .device-left{display:flex;flex-direction:column;gap:3px;}
-  .device-meta{font-family:var(--mono);font-size:10px;color:var(--text-dim);}
-  .since-row{font-family:var(--mono);font-size:10px;color:var(--text-dim);}
+  .switch-info{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .switch-title{font-size:13px;font-weight:600;color:var(--text);}
+  .switch-sub{font-size:11px;color:var(--text-dim);}
+  .switch-control{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .switch-status-label{
+    font-size:11px;font-weight:700;letter-spacing:.03em;
+    padding:3px 9px;border-radius:999px;
+  }
+  .switch-status-label.on{color:var(--green);background:color-mix(in srgb,var(--green) 15%,transparent);}
+  .switch-status-label.off{color:var(--text-dim);background:var(--track);}
+  /* Toggle grande estilo iOS */
+  .ios-toggle{position:relative;width:51px;height:31px;flex-shrink:0;}
+  .ios-toggle input{opacity:0;width:0;height:0;}
+  .ios-toggle-track{
+    position:absolute;cursor:pointer;inset:0;
+    background:color-mix(in srgb,var(--text) 18%,transparent);
+    border-radius:999px;transition:background .25s;
+    border:1px solid color-mix(in srgb,var(--text) 8%,transparent);
+  }
+  .ios-toggle-track:before{
+    content:'';position:absolute;height:25px;width:25px;left:2px;top:2px;
+    background:#fff;border-radius:50%;transition:transform .25s;
+    box-shadow:0 2px 5px rgba(0,0,0,.3);
+  }
+  .ios-toggle input:checked + .ios-toggle-track{background:var(--green);}
+  .ios-toggle input:checked + .ios-toggle-track:before{transform:translateX(20px);}
+
+  /* ── Cuerpo expandible ── */
+  .device-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .3s ease;overflow:hidden;}
+  .device-row.collapsed .device-body{grid-template-rows:0fr;}
+  .device-body-inner{min-height:0;padding:0 17px;transition:padding .3s;}
+  .device-row.collapsed .device-body-inner{padding-top:0;padding-bottom:0;}
+
+  .device-body-content{
+    border-top:1px solid color-mix(in srgb,var(--text) 7%,transparent);
+    padding:13px 0 8px;
+    display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;
+  }
+  .device-left{display:flex;flex-direction:column;gap:4px;min-width:0;}
+  .device-meta{font-family:var(--mono);font-size:10.5px;color:var(--text-dim);}
+  .since-row{font-size:12px;color:var(--text-dim);}
   .error-text{color:var(--amber);}
-  .device-right{text-align:right;font-family:var(--mono);font-size:10px;color:var(--text-dim);flex-shrink:0;}
-  .latency{font-size:11px;font-weight:600;}
+  .device-right{text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--text-dim);flex-shrink:0;}
+  .latency{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;}
   .latency.fast{color:var(--green);}
   .latency.slow{color:var(--amber);}
   .latency.vslow{color:var(--red);}
 
+  /* ── Sensores (sub-chips cristal) ── */
+  .ha-sensors{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;}
+  .ha-sensor{
+    font-size:11px;font-weight:500;color:var(--text-dim);
+    background:var(--track);
+    border:1px solid color-mix(in srgb,var(--text) 5%,transparent);
+    border-radius:10px;padding:5px 9px;
+    display:inline-flex;align-items:center;gap:5px;
+  }
+  .ha-sensor b{font-weight:700;color:var(--text);}
+
   /* ── Sparkline ── */
-  .sparkline-wrap{margin-top:4px;}
+  .sparkline-wrap{margin-top:6px;}
   .sparkline svg{display:block;}
 
-  /* ── Uptime bar ── */
-  .uptime-row{display:flex;align-items:center;gap:8px;margin-top:6px;margin-bottom:8px;}
-  .uptime-bar{flex:1;height:5px;border-radius:3px;overflow:hidden;display:flex;background:var(--panel-border);}
-  .uptime-seg{height:100%;}
-  .uptime-seg.on{background:var(--green);}
-  .uptime-seg.off{background:var(--red);}
-  .uptime-pct{font-family:var(--mono);font-size:10px;flex-shrink:0;width:36px;text-align:right;}
+  /* ── Uptime (solo texto, sin barra) ── */
+  .uptime-pct{font-family:var(--mono);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;}
 
-  /* ── Device actions ── */
-  .device-actions{display:flex;gap:6px;padding:4px 0 10px;}
-  .btn-xs{
-    font-family:var(--mono);font-size:10px;padding:3px 8px;
-    border-radius:4px;border:1px solid var(--panel-border);
-    background:none;color:var(--text-dim);cursor:pointer;
-    transition:border-color .2s,color .2s;
+  /* ── Acciones: botones circulares cristal (como los de cabecera) ── */
+  .device-actions{display:flex;gap:9px;padding:6px 0 15px;align-items:center;}
+  .act-btn{
+    width:34px;height:34px;border-radius:999px;
+    background:var(--card-bg);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--card-ring);
+    box-shadow:var(--card-shadow);
+    color:var(--text-dim);cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;
+    transition:transform .12s,opacity .12s,color .15s;
   }
-  .btn-xs.edit:hover{border-color:var(--blue);color:var(--blue);}
-  .btn-xs.del:hover{border-color:var(--red);color:var(--red);}
-  .btn-xs.maint{border-color:var(--amber);color:var(--amber);}
-  .btn-xs.maint.active{background:rgba(255,180,84,.1);}
-  .badge-maint{font-family:var(--mono);font-size:9px;color:var(--amber);
-    border:1px solid rgba(255,180,84,.4);border-radius:3px;padding:1px 5px;margin-left:4px;}
-  .ha-sensors{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;}
-  .ha-sensor{font-family:var(--mono);font-size:11px;color:var(--text-dim);}
-  .ha-sensor span{font-weight:600;color:var(--text-primary);}
+  .act-btn:active{transform:scale(.88);opacity:.6;}
+  .act-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;}
+  .act-btn.maint{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 30%,transparent);}
+  .act-btn.maint.active{background:color-mix(in srgb,var(--amber) 16%,transparent);}
+  .act-btn.del{color:var(--text-dim);}
+  .act-btn.del:active{color:var(--red);}
+  .actions-hint{font-size:11px;color:var(--text-dim);margin-left:auto;}
 
-  /* Toggle switch */
-  .toggle-wrap{display:flex;align-items:center;gap:8px;padding:6px 0 10px;}
-  .toggle-label{font-family:var(--mono);font-size:10px;color:var(--text-dim);}
-  .toggle{position:relative;width:36px;height:20px;flex-shrink:0;}
-  .toggle input{opacity:0;width:0;height:0;}
-  .toggle-slider{
-    position:absolute;cursor:pointer;inset:0;
-    background:var(--panel-border);border-radius:20px;
-    transition:background .2s;
-  }
-  .toggle-slider:before{
-    content:'';position:absolute;height:14px;width:14px;
-    left:3px;bottom:3px;background:white;border-radius:50%;
-    transition:transform .2s;
-  }
-  .toggle input:checked + .toggle-slider{background:var(--green);}
-  .toggle input:checked + .toggle-slider:before{transform:translateX(16px);}
-  .toggle-status{font-family:var(--mono);font-size:10px;font-weight:600;}
-  .toggle-status.on{color:var(--green);}
-  .toggle-status.off{color:var(--text-dim);}
+  footer{margin-top:32px;text-align:center;font-size:11px;color:var(--text-dim);font-family:var(--mono);}
 
-  footer{margin-top:28px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text-dim);}
-
+  @media(min-width:521px){.clock{display:block;}}
   @media(max-width:520px){
-    header{gap:6px;}
-    .clock{display:none;}
-    .device-header{grid-template-columns:16px 1fr auto 18px;gap:8px;padding:9px 12px;}
+    header{gap:8px;}
+    h1{font-size:26px;}
+    .device-header{gap:10px;padding:14px 15px;}
+    .device-name{font-size:15px;}
   }
   @media(prefers-reduced-motion:reduce){.led.off{animation:none;}}
 </style>
+
 <style>
-  /* ── Modal ── */
-  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);
-    z-index:100;align-items:center;justify-content:center;padding:20px;}
-  .modal-overlay.open{display:flex;}
-  .modal{background:#131816;border:1px solid var(--panel-border);border-radius:12px;
-    padding:22px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;}
-  .modal h2{margin:0 0 18px;font-size:15px;font-weight:600;}
-  .fg{margin-bottom:13px;}
-  .fg label{display:block;font-family:var(--mono);font-size:10px;color:var(--text-dim);
-    margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em;}
-  .fg input,.fg select{
-    width:100%;background:var(--panel);border:1px solid var(--panel-border);
-    border-radius:6px;color:var(--text-primary);font-family:var(--mono);
-    font-size:13px;padding:7px 11px;outline:none;transition:border-color .2s;
+  /* ─────────── Modal (bottom sheet cristal) ─────────── */
+  .modal-overlay{display:none;position:fixed;inset:0;background:var(--overlay);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    z-index:100;align-items:flex-end;justify-content:center;padding:0;}
+  .modal-overlay.open{display:flex;animation:fadeIn .18s ease;}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .modal{
+    background:var(--sheet);
+    backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
+    border:1px solid var(--card-ring);
+    border-radius:26px 26px 0 0;
+    padding:18px 20px calc(20px + env(safe-area-inset-bottom));
+    width:100%;max-width:520px;max-height:88dvh;overflow-y:auto;
+    box-shadow:0 -10px 50px rgba(0,0,0,.4);
+    animation:slideUp .25s cubic-bezier(0.32,0.72,0,1);
   }
-  .fg input:focus,.fg select:focus{border-color:var(--green);}
-  .fg select option{background:#131816;}
-  .modal-actions{display:flex;gap:8px;margin-top:18px;}
-  .btn-save{flex:1;background:var(--green);color:#0b0e0d;border:none;border-radius:6px;
-    font-family:var(--mono);font-size:12px;font-weight:700;padding:10px;cursor:pointer;transition:opacity .2s;}
-  .btn-save:hover{opacity:.85;}
-  .btn-cancel2{flex:1;background:none;border:1px solid var(--panel-border);border-radius:6px;
-    color:var(--text-dim);font-family:var(--mono);font-size:12px;padding:10px;cursor:pointer;transition:border-color .2s,color .2s;}
-  .btn-cancel2:hover{border-color:var(--red);color:var(--red);}
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  @media(min-width:521px){
+    .modal-overlay{align-items:center;padding:20px;}
+    .modal{border-radius:26px;animation:fadeIn .18s ease;}
+  }
+  .modal-handle{width:40px;height:5px;border-radius:999px;background:var(--text-tertiary);opacity:.5;margin:0 auto 14px;}
+  .modal h2{margin:0 0 18px;font-size:20px;font-weight:700;letter-spacing:-.02em;}
+  .fg{margin-bottom:14px;}
+  .fg label{display:block;font-size:11px;font-weight:600;color:var(--text-dim);
+    margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em;}
+  .fg input,.fg select{
+    width:100%;background:var(--track);border:1px solid var(--card-ring);
+    border-radius:14px;color:var(--text);font-family:var(--sans);
+    font-size:16px;padding:12px 14px;outline:none;transition:border-color .2s;
+  }
+  .fg input:focus,.fg select:focus{border-color:var(--accent);}
+  .fg select option{background:var(--sheet);}
+  .modal-actions{display:flex;gap:10px;margin-top:20px;}
+  .btn-save{flex:1;background:var(--accent);color:#fff;border:none;border-radius:14px;
+    font-family:var(--sans);font-size:16px;font-weight:600;padding:14px;cursor:pointer;transition:opacity .15s;}
+  .btn-save:active{opacity:.8;}
+  .btn-cancel2{flex:1;background:var(--track);border:1px solid var(--card-ring);border-radius:14px;
+    color:var(--text);font-family:var(--sans);font-size:16px;font-weight:600;padding:14px;cursor:pointer;transition:background .15s;}
+  .btn-cancel2:active{background:color-mix(in srgb,var(--text) 8%,transparent);}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div>
-      <div class="eyebrow">Infraestructura doméstica</div>
-      <h1>Panel de estado</h1>
+      <div class="eyebrow">Casa</div>
+      <h1>Monitor</h1>
     </div>
     <div class="header-actions">
       <span class="clock" id="clock">--:--:--</span>
-      <button class="btn theme-btn" id="theme-btn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
-      <a href="/historial" class="btn" title="Historial">📋</a>
-      <button class="btn" id="check-btn" onclick="forceCheck()" title="Comprobar ahora">⟳</button>
-      <button class="btn add" onclick="openModal()" title="Añadir dispositivo">＋</button>
-      <button class="btn" id="notif-btn" onclick="toggleNotifications()">🔔</button>
+      <button class="icon-btn" id="theme-btn" onclick="toggleTheme()" title="Tema" aria-label="Tema">
+        <svg id="theme-icon" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <a href="/historial" class="icon-btn" title="Historial" aria-label="Historial">
+        <svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+      </a>
+      <button class="icon-btn" id="check-btn" onclick="forceCheck()" title="Comprobar ahora" aria-label="Comprobar">
+        <svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+      <button class="icon-btn add" onclick="openModal()" title="Añadir" aria-label="Añadir dispositivo">
+        <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="icon-btn" id="notif-btn" onclick="toggleNotifications()" title="Notificaciones" aria-label="Notificaciones">
+        <svg id="notif-icon" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </button>
     </div>
   </header>
-  <div class="summary-bar" id="summary-bar"><div class="chip">Cargando…</div></div>
+  <div class="summary-bar" id="summary-bar"><div class="chip"><span class="dot"></span>Cargando…</div></div>
   <div class="device-list" id="device-list"></div>
   <footer id="footer-note">Comprobando conexión…</footer>
 </div>
 
 <!-- Modal -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModalOnBg(event)">
-  <div class="modal">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
     <h2 id="modal-title">Añadir dispositivo</h2>
     <div class="fg"><label>Nombre</label><input type="text" id="f-name" placeholder="Ej: Router Casa"></div>
     <div class="fg"><label>ID único</label><input type="text" id="f-id" placeholder="router_casa"></div>
@@ -268,8 +360,18 @@ let editingId=null;
 function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES');}
 setInterval(updateClock,1000);updateClock();
 
-// Tema
-function applyTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('homem_theme',t);document.getElementById('theme-btn').textContent=t==='dark'?'🌙':'☀️';}
+// Tema — icono SVG outline (luna / sol)
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  localStorage.setItem('homem_theme',t);
+  const icon=document.getElementById('theme-icon');
+  if(icon){
+    icon.innerHTML = t==='dark'
+      ? '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'  // luna
+      : '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>';  // sol
+  }
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content',t==='dark'?'#0e0f13':'#f5f6f8');
+}
 function toggleTheme(){applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');}
 applyTheme(localStorage.getItem('homem_theme')||'dark');
 
@@ -281,13 +383,18 @@ function applyOrder(devices){
   return[...devices].sort((a,b)=>{const ia=o.indexOf(a.id),ib=o.indexOf(b.id);if(ia===-1&&ib===-1)return 0;if(ia===-1)return 1;if(ib===-1)return-1;return ia-ib;});
 }
 
-// Colapsado
+// Colapsado — el estado se persiste por dispositivo.
+// Para ha_switch (AdGuard) el valor por defecto es PLEGADO (true),
+// para el resto es DESPLEGADO (false). toggleCollapsed respeta el estado real del DOM.
 function loadCollapsed(){try{return JSON.parse(localStorage.getItem(COLLAPSED_KEY))||{};}catch{return{};}}
 function saveCollapsed(m){localStorage.setItem(COLLAPSED_KEY,JSON.stringify(m));}
 function toggleCollapsed(id){
-  const m=loadCollapsed();m[id]=!m[id];saveCollapsed(m);
   const r=document.querySelector(`.device-row[data-id="${id}"]`);
-  if(r)r.classList.toggle('collapsed',m[id]);
+  if(!r)return;
+  const isNowCollapsed=r.classList.toggle('collapsed');   // invierte el estado visual real
+  const m=loadCollapsed();
+  m[id]=isNowCollapsed;
+  saveCollapsed(m);
 }
 
 // Latencia
@@ -299,85 +406,107 @@ function latencyHtml(ms){
   return`<div class="latency ${cls}">${lbl}</div>`;
 }
 
-// Sparkline SVG (mini grafica de linea)
+// Sparkline SVG
 const sparkCache={};
 function sparklineHtml(id){
   const pts=sparkCache[id];
   if(!pts||pts.length<2)return'';
-  const W=80,H=24,max=Math.max(...pts,1),min=Math.min(...pts,0);
+  const W=100,H=28,max=Math.max(...pts,1),min=Math.min(...pts,0);
   const range=max-min||1;
   const avg=pts.reduce((a,b)=>a+b,0)/pts.length;
   const color=avg>2000?'var(--red)':avg>500?'var(--amber)':'var(--green)';
   const coords=pts.map((v,i)=>`${(i/(pts.length-1)*W).toFixed(1)},${(H-(v-min)/range*H).toFixed(1)}`).join(' ');
-  return`<div class="sparkline-wrap" title="Latencia (${pts.length} muestras, media ${Math.round(avg)}ms)"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline points="${coords}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg></div>`;
+  return`<div class="sparkline-wrap" title="Latencia (${pts.length} muestras, media ${Math.round(avg)}ms)"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline points="${coords}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></div>`;
 }
 
 // Summary
 function renderSummary(devices){
   const bar=document.getElementById('summary-bar');
   const total=devices.length,down=devices.filter(d=>!d.online).length;
-  bar.innerHTML=!down?`<div class="chip">${total} dispositivos · todo operativo</div>`
-    :`<div class="chip alert">${down} de ${total} caído${down>1?'s':''}</div><div class="chip">${total-down} operativos</div>`;
+  bar.innerHTML=!down?`<div class="chip"><span class="dot"></span>${total} dispositivos · todo operativo</div>`
+    :`<div class="chip alert"><span class="dot"></span>${down} de ${total} caído${down>1?'s':''}</div><div class="chip">${total-down} operativos</div>`;
 }
 
-// Render
+// ───── Iconos SVG reutilizables ─────
+const ICONS={
+  chevron:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  grip:'<svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  wrench:'<svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>'
+};
+
+// Render de tarjetas
 function renderDevices(devices){
   const ordered=applyOrder(devices),collapsed=loadCollapsed();
   const list=document.getElementById('device-list');
   list.innerHTML=ordered.map(d=>{
     const lc=d.online?'on':'off';
-    const rc=(d.online?'':'is-down')+(collapsed[d.id]?' collapsed':'');
+    // AdGuard con protección desactivada: tono diferenciado (ámbar) aunque esté online
+    const protectionOff = (d.type==='ha_switch' && d.switch_state==='off');
+    // Estado plegado: ha_switch (AdGuard) PLEGADO por defecto; resto DESPLEGADO.
+    // El interruptor de AdGuard vive fuera del cuerpo plegable, así que sigue visible.
+    // Si el usuario ya tiene preferencia guardada, se respeta.
+    const defaultCollapsed = (d.type==='ha_switch');
+    const isCollapsed = (typeof collapsed[d.id]==='boolean') ? collapsed[d.id] : defaultCollapsed;
+    const rc=(d.online?'':'is-down')+(isCollapsed?' collapsed':'')+(protectionOff?' protection-off':'');
     const sc=d.online?'up':'down';
     const sl=d.online?'Online':'Offline';
-    const since=d.online?`Estable ${d.since_human}`:`Caido ${d.since_human}`;
-    const err=d.last_error?`<span class="error-text"> · ${d.last_error}</span>`:'';
-    const maintBadge=d.in_maintenance?`<span class="badge-maint">🔧 mantenimiento</span>`:'';
+    const since=d.online?`${d.since_human} en línea`:`caído hace ${d.since_human}`;
+    const maintBadge=d.in_maintenance?`<span class="badge-maint">Mant.</span>`:'';
     const haSensors=d.id==='home_assistant'?`<div id="ha-sensors" class="ha-sensors"></div>`:'';
+    const extraSensors=(d.id==='adguard')?`<div id="adguard-sensors" class="ha-sensors"></div>`:'';
+
+    // Fila PROTECCIÓN para ha_switch (siempre visible, debajo de la cabecera)
+    const switchRow = (d.type==='ha_switch') ? `
+      <div class="switch-row">
+        <div class="switch-info">
+          <span class="switch-title">Bloqueo de anuncios</span>
+          <span class="switch-sub">Protección DNS de AdGuard</span>
+        </div>
+        <div class="switch-control">
+          <span class="switch-status-label ${d.switch_state==='on'?'on':'off'}" id="switch-status-${d.id}">
+            ${d.switch_state==='on'?'Activado':(d.switch_state==='off'?'Desactivado':'—')}
+          </span>
+          <label class="ios-toggle" onclick="event.stopPropagation()">
+            <input type="checkbox" id="switch-input-${d.id}" ${d.switch_state==='on'?'checked':''}
+              onchange="toggleSwitch('${d.id}', this.checked)">
+            <span class="ios-toggle-track"></span>
+          </label>
+        </div>
+      </div>` : '';
+
     return`<div class="device-row ${rc}" draggable="true" data-id="${d.id}">
       <div class="device-header">
         <div class="led ${lc}"></div>
         <div class="device-name-row">
           <span class="device-name">${d.name}</span>
-          <span class="status-inline ${sc}">${sl}</span>
           ${maintBadge}
         </div>
-        <div class="collapse-btn">▾</div>
-        <div class="drag-handle">⠿</div>
+        <span class="status-pill ${sc}">${sl}</span>
+        <span class="collapse-btn">${ICONS.chevron}</span>
+        <span class="drag-handle">${ICONS.grip}</span>
       </div>
+      ${switchRow}
       <div class="device-body"><div class="device-body-inner">
         <div class="device-body-content">
           <div class="device-left">
-            <div class="device-meta">${d.id}${err}</div>
             <div class="since-row">${since}</div>
+            ${d.last_error?`<div class="error-text">${d.last_error}</div>`:''}
             ${haSensors}
+            ${extraSensors}
             ${sparklineHtml(d.id)}
           </div>
           <div class="device-right">
             ${latencyHtml(d.response_ms)}
-            <div id="uptime-pct-${d.id}" style="margin-top:3px">…</div>
+            <div class="uptime-pct" id="uptime-pct-${d.id}">…</div>
           </div>
         </div>
-        <div class="uptime-row">
-          <div class="uptime-bar" id="uptime-bar-${d.id}"></div>
-          <div class="uptime-pct" id="uptime-pct2-${d.id}"></div>
-        </div>
         <div class="device-actions">
-          <button class="btn-xs edit" onclick="editDevice('${d.id}')">✏️ Editar</button>
-          <button class="btn-xs maint ${d.in_maintenance?'active':''}" onclick="toggleMaintenance('${d.id}',${d.in_maintenance})">🔧 ${d.in_maintenance?'Fin mantenimiento':'Mantenimiento'}</button>
-          <button class="btn-xs del" onclick="confirmDelete('${d.id}','${d.name}')">🗑 Borrar</button>
+          <button class="act-btn edit" title="Editar" aria-label="Editar" onclick="editDevice('${d.id}')">${ICONS.edit}</button>
+          <button class="act-btn maint ${d.in_maintenance?'active':''}" title="Mantenimiento" aria-label="Mantenimiento" onclick="toggleMaintenance('${d.id}',${d.in_maintenance})">${ICONS.wrench}</button>
+          <button class="act-btn del" title="Borrar" aria-label="Borrar" onclick="confirmDelete('${d.id}','${d.name}')">${ICONS.trash}</button>
         </div>
-        ${d.type === 'ha_switch' ? `
-        <div class="toggle-wrap">
-          <label class="toggle" title="Activar/Desactivar">
-            <input type="checkbox" id="toggle-${d.id}" ${d.switch_state === 'on' ? 'checked' : ''}
-              onchange="toggleSwitch('${d.id}', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-          <span class="toggle-label">Protección</span>
-          <span class="toggle-status ${d.switch_state === 'on' ? 'on' : 'off'}" id="toggle-status-${d.id}">
-            ${d.switch_state === 'on' ? 'ACTIVA' : 'INACTIVA'}
-          </span>
-        </div>` : ''}
       </div></div>
     </div>`;
   }).join('');
@@ -392,11 +521,7 @@ async function loadUptime(id){
     const pct=data.uptime_pct;
     const col=pct>=99?'var(--green)':pct>=90?'var(--amber)':'var(--red)';
     const el=document.getElementById(`uptime-pct-${id}`);
-    const el2=document.getElementById(`uptime-pct2-${id}`);
-    const bar=document.getElementById(`uptime-bar-${id}`);
-    if(el)el.textContent='';
-    if(el2){el2.textContent=pct+'%';el2.style.color=col;}
-    if(bar)bar.innerHTML=data.segments.map(s=>`<div class="uptime-seg ${s.online?'on':'off'}" style="width:${Math.max(.2,s.pct).toFixed(2)}%"></div>`).join('');
+    if(el){el.textContent='↑ '+pct+'%';el.style.color=col;}
   }catch{}
 }
 
@@ -405,7 +530,6 @@ async function loadLatency(id){
     const data=await(await fetch(`/api/latency/${id}`)).json();
     if(data.points&&data.points.length){
       sparkCache[id]=data.points.map(p=>p.ms);
-      // Actualizar sparkline sin re-render completo
       const row=document.querySelector(`.device-row[data-id="${id}"] .sparkline-wrap`);
       if(row)row.outerHTML=sparklineHtml(id);
     }
@@ -418,7 +542,6 @@ async function loadLatency(id){
 function updateFields(){
   const t=document.getElementById('f-type').value;
   ['http','ping','port','ha'].forEach(k=>document.getElementById('fields-'+k).style.display=t===(k==='ha'?'ha_entity':k)?'':'none');
-  // ha_switch también usa el campo entity_id
   if(t==='ha_switch') document.getElementById('fields-ha').style.display='';
 }
 function openModal(device){
@@ -462,36 +585,31 @@ async function confirmDelete(id,name){
   await fetch(`/api/devices/${id}`,{method:'DELETE'});refresh();
 }
 
-// Toggle switch HA
+// Toggle AdGuard
 async function toggleSwitch(id, checked){
   const action = checked ? 'turn_on' : 'turn_off';
-  const statusEl = document.getElementById(`toggle-status-${id}`);
-  const checkbox = document.getElementById(`toggle-${id}`);
-
-  // Feedback visual inmediato
-  if(statusEl){ statusEl.textContent = checked ? 'ACTIVANDO…' : 'DESACTIVANDO…'; statusEl.className='toggle-status'; }
-
+  const statusEl = document.getElementById(`switch-status-${id}`);
+  const input = document.getElementById(`switch-input-${id}`);
+  if(statusEl){ statusEl.textContent='...'; statusEl.className='switch-status-label off'; }
   try {
     const res = await fetch(`/api/toggle/${id}`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json'},
       body: JSON.stringify({action})
     });
     const data = await res.json();
     if(!data.ok){
-      // Revertir si falló
-      if(checkbox) checkbox.checked = !checked;
-      if(statusEl){ statusEl.textContent = 'ERROR'; statusEl.className='toggle-status off'; }
+      if(input) input.checked = !checked;
+      if(statusEl){ statusEl.textContent='Error'; statusEl.className='switch-status-label off'; }
       alert('Error: ' + data.message);
     } else {
       if(statusEl){
-        statusEl.textContent = checked ? 'ACTIVA' : 'INACTIVA';
-        statusEl.className = 'toggle-status ' + (checked ? 'on' : 'off');
+        statusEl.textContent = checked ? 'Activado' : 'Desactivado';
+        statusEl.className = 'switch-status-label ' + (checked ? 'on' : 'off');
       }
     }
   } catch {
-    if(checkbox) checkbox.checked = !checked;
-    if(statusEl){ statusEl.textContent = 'ERROR'; statusEl.className='toggle-status off'; }
+    if(input) input.checked = !checked;
+    if(statusEl){ statusEl.textContent='Error'; statusEl.className='switch-status-label off'; }
   }
 }
 
@@ -501,7 +619,10 @@ function initInteractions(){
   const rows=[...list.querySelectorAll('.device-row')];
   let dragged=null;
   rows.forEach(row=>{
-    row.querySelector('.device-header').addEventListener('click',e=>{if(!e.target.closest('.drag-handle'))toggleCollapsed(row.dataset.id);});
+    row.querySelector('.device-header').addEventListener('click',e=>{
+      if(!e.target.closest('.drag-handle')&&!e.target.closest('.switch-row')&&!e.target.closest('.ios-toggle'))
+        toggleCollapsed(row.dataset.id);
+    });
     row.addEventListener('dragstart',e=>{if(!e.target.closest('.drag-handle')&&e.target!==row){e.preventDefault();return;}dragged=row;setTimeout(()=>row.classList.add('dragging'),0);});
     row.addEventListener('dragend',()=>{row.classList.remove('dragging');list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));persistOrder();});
     row.addEventListener('dragover',e=>{e.preventDefault();if(row!==dragged){list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));row.classList.add('drag-over');}});
@@ -511,7 +632,7 @@ function initInteractions(){
   rows.forEach(row=>{
     row.querySelector('.drag-handle').addEventListener('touchstart',e=>{
       td=row;const t=e.touches[0],r=row.getBoundingClientRect();tOY=t.clientY-r.top;
-      tc=row.cloneNode(true);Object.assign(tc.style,{position:'fixed',zIndex:1000,width:r.width+'px',left:r.left+'px',top:r.top+'px',opacity:.85,pointerEvents:'none',border:'1px solid var(--green)',borderRadius:'8px',background:'var(--panel)',transition:'none'});
+      tc=row.cloneNode(true);Object.assign(tc.style,{position:'fixed',zIndex:1000,width:r.width+'px',left:r.left+'px',top:r.top+'px',opacity:.85,pointerEvents:'none',border:'1px solid var(--accent)',borderRadius:'22px',background:'var(--sheet)',transition:'none'});
       document.body.appendChild(tc);row.classList.add('dragging');e.preventDefault();
     },{passive:false});
   });
@@ -533,15 +654,24 @@ function persistOrder(){saveOrder([...document.querySelectorAll('.device-row')].
 
 // Fetch
 async function loadHaSensors(){
-  const el=document.getElementById('ha-sensors');
-  if(!el)return;
   try{
     const data=await(await fetch('/api/ha-sensors')).json();
-    const cpu=data['sensor.system_monitor_temperatura_del_procesador'];
-    const ram=data['sensor.system_monitor_uso_de_memoria_2'];
-    el.innerHTML=
-      (cpu?`<div class="ha-sensor">🌡 CPU <span>${cpu.state}${cpu.unit}</span></div>`:'')
-     +(ram?`<div class="ha-sensor">💾 RAM <span>${ram.state}${ram.unit}</span></div>`:'');
+    const el=document.getElementById('ha-sensors');
+    if(el){
+      const cpu=data['sensor.system_monitor_temperatura_del_procesador'];
+      const ram=data['sensor.system_monitor_uso_de_memoria_2'];
+      el.innerHTML=
+        (cpu?`<div class="ha-sensor">CPU <b>${cpu.state}${cpu.unit}</b></div>`:'')
+       +(ram?`<div class="ha-sensor">RAM <b>${ram.state}${ram.unit}</b></div>`:'');
+    }
+    const elAd=document.getElementById('adguard-sensors');
+    if(elAd){
+      const dns=data['sensor.adguard_home_consultas_dns'];
+      const blocked=data['sensor.adguard_home_proporcion_de_consultas_dns_bloqueadas'];
+      elAd.innerHTML=
+        (dns?`<div class="ha-sensor">Consultas <b>${dns.state}</b></div>`:'')
+       +(blocked?`<div class="ha-sensor">Bloqueo <b>${blocked.state}${blocked.unit}</b></div>`:'');
+    }
   }catch{}
 }
 
@@ -558,7 +688,7 @@ async function toggleMaintenance(id, isActive){
 
 async function forceCheck(){
   const btn=document.getElementById('check-btn');
-  btn.textContent='⟳';btn.disabled=true;btn.style.opacity='.5';
+  btn.disabled=true;btn.style.opacity='.5';
   await fetch('/api/force-check',{method:'POST'});
   setTimeout(()=>{refresh();btn.disabled=false;btn.style.opacity='';}, 2000);
 }
@@ -573,21 +703,18 @@ async function refresh(){
       renderDevices(data.devices);
       _firstRender=false;
     } else {
-      // Actualizar solo los datos dinamicos sin re-renderizar las tarjetas
       data.devices.forEach(d=>{
         const row=document.querySelector(`.device-row[data-id="${d.id}"]`);
         if(!row)return;
-        // LED y clase
         const led=row.querySelector('.led');
         if(led){led.className='led '+(d.online?'on':'off');}
         row.classList.toggle('is-down',!d.online);
-        // Status inline
-        const si=row.querySelector('.status-inline');
-        if(si){si.className='status-inline '+(d.online?'up':'down');si.textContent=d.online?'Online':'Offline';}
-        // Since
+        const si=row.querySelector('.status-pill');
+        if(si){si.className='status-pill '+(d.online?'up':'down');si.textContent=d.online?'Online':'Offline';}
         const sr=row.querySelector('.since-row');
-        if(sr)sr.textContent=d.online?`Estable ${d.since_human}`:`Caido ${d.since_human}`;
-        // Latencia
+        if(sr)sr.textContent=d.online?`${d.since_human} en línea`:`caído hace ${d.since_human}`;
+        // Reflejar protección desactivada (AdGuard) en el borde de la tarjeta
+        row.classList.toggle('protection-off', d.type==='ha_switch' && d.switch_state==='off');
         const dr=row.querySelector('.device-right');
         if(dr){
           const lh=dr.querySelector('.latency');
@@ -596,17 +723,25 @@ async function refresh(){
           if(lh)lh.replaceWith(newLh.firstChild||lh);
           else if(newLh.firstChild)dr.prepend(newLh.firstChild);
         }
-        // Maintenance badge
         const nameRow=row.querySelector('.device-name-row');
         const oldBadge=nameRow&&nameRow.querySelector('.badge-maint');
         if(nameRow){
           if(d.in_maintenance&&!oldBadge){
-            const b=document.createElement('span');b.className='badge-maint';b.textContent='🔧 mantenimiento';nameRow.appendChild(b);
+            const b=document.createElement('span');b.className='badge-maint';b.textContent='Mant.';nameRow.appendChild(b);
           } else if(!d.in_maintenance&&oldBadge){oldBadge.remove();}
         }
-        // Boton mantenimiento
-        const mb=row.querySelector('.btn-xs.maint');
-        if(mb){mb.textContent='🔧 '+(d.in_maintenance?'Fin mantenimiento':'Mantenimiento');mb.classList.toggle('active',d.in_maintenance);mb.onclick=()=>toggleMaintenance(d.id,d.in_maintenance);}
+        const mb=row.querySelector('.act-btn.maint');
+        if(mb){mb.classList.toggle('active',d.in_maintenance);mb.onclick=()=>toggleMaintenance(d.id,d.in_maintenance);}
+        // Estado del switch — sin sobrescribir mientras el usuario interactúa
+        if(d.type==='ha_switch' && d.switch_state!=null){
+          const input=row.querySelector('#switch-input-'+CSS.escape(d.id));
+          const st=row.querySelector('#switch-status-'+CSS.escape(d.id));
+          if(input && document.activeElement!==input) input.checked=(d.switch_state==='on');
+          if(st){
+            st.textContent=d.switch_state==='on'?'Activado':'Desactivado';
+            st.className='switch-status-label '+(d.switch_state==='on'?'on':'off');
+          }
+        }
       });
     }
     document.getElementById('footer-note').textContent=`Actualizado cada ${REFRESH_MS/1000}s · ${new Date(data.server_time*1000).toLocaleTimeString('es-ES')}`;
@@ -619,11 +754,11 @@ refresh();setInterval(refresh,REFRESH_MS);
 let swReg=null;
 async function initPush(){
   const btn=document.getElementById('notif-btn');
-  if(!('serviceWorker' in navigator)||!('PushManager' in window)){btn.textContent='🔕';return;}
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){return;}
   swReg=await navigator.serviceWorker.register('/static/sw.js');
   await navigator.serviceWorker.ready;
   const sub=await swReg.pushManager.getSubscription();
-  if(sub){btn.textContent='🔕';btn.classList.add('notif-on');}
+  if(sub){btn.classList.add('active');}
 }
 async function toggleNotifications(){
   const btn=document.getElementById('notif-btn');
@@ -632,15 +767,15 @@ async function toggleNotifications(){
   if(sub){
     await sub.unsubscribe();
     await fetch('/api/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});
-    btn.textContent='🔔';btn.classList.remove('notif-on');
+    btn.classList.remove('active');
     alert('Notificaciones desactivadas.');return;
   }
   const perm=await Notification.requestPermission();
-  if(perm!=='granted'){btn.textContent='🚫';alert('Permiso de notificaciones denegado en el navegador.');return;}
+  if(perm!=='granted'){alert('Permiso de notificaciones denegado en el navegador.');return;}
   const{publicKey}=await(await fetch('/api/vapid-key')).json();
   const newSub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(publicKey)});
   await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(newSub.toJSON())});
-  btn.textContent='🔕';btn.classList.add('notif-on');
+  btn.classList.add('active');
   alert('Notificaciones activadas correctamente.');
 }
 function urlBase64ToUint8Array(b64){

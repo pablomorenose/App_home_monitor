@@ -47,6 +47,11 @@ def init_db():
                     response_ms INTEGER
                 )
             """)
+            # Estado on/off de switches de Home Assistant (NULL si no es switch)
+            cur.execute("""
+                ALTER TABLE device_status
+                ADD COLUMN IF NOT EXISTS switch_state TEXT
+            """)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS status_history (
                     id SERIAL PRIMARY KEY,
@@ -148,7 +153,8 @@ def seed_devices_from_config():
 # -----------------------------------------------------------------------
 
 def update_status(device_id: str, name: str, online: bool,
-                  error: str | None = None, response_ms: int | None = None):
+                  error: str | None = None, response_ms: int | None = None,
+                  switch_state: str | None = None):
     now = time.time()
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -161,9 +167,9 @@ def update_status(device_id: str, name: str, online: bool,
             if row is None:
                 cur.execute("""
                     INSERT INTO device_status
-                    (device_id, name, online, last_change_ts, last_check_ts, last_error, response_ms)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (device_id, name, int(online), now, now, error, response_ms))
+                    (device_id, name, online, last_change_ts, last_check_ts, last_error, response_ms, switch_state)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (device_id, name, int(online), now, now, error, response_ms, switch_state))
                 cur.execute(
                     "INSERT INTO status_history (device_id, online, ts, response_ms) VALUES (%s, %s, %s, %s)",
                     (device_id, int(online), now, response_ms),
@@ -176,9 +182,10 @@ def update_status(device_id: str, name: str, online: bool,
             cur.execute("""
                 UPDATE device_status
                 SET name = %s, online = %s, last_change_ts = %s,
-                    last_check_ts = %s, last_error = %s, response_ms = %s
+                    last_check_ts = %s, last_error = %s, response_ms = %s,
+                    switch_state = %s
                 WHERE device_id = %s
-            """, (name, int(online), last_change_ts, now, error, response_ms, device_id))
+            """, (name, int(online), last_change_ts, now, error, response_ms, switch_state, device_id))
 
             # Guardar siempre la latencia para sparkline, solo guardar cambio de estado si cambio
             cur.execute(

@@ -113,6 +113,29 @@ def api_maintenance(device_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/toggle/<device_id>", methods=["POST"])
+def api_toggle(device_id):
+    """Activa o desactiva un switch de Home Assistant."""
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    data = request.get_json() or {}
+    action = data.get("action")
+    if action not in ("turn_on", "turn_off", "toggle"):
+        return jsonify({"ok": False, "message": "Acción inválida (turn_on/turn_off/toggle)"}), 400
+
+    devices = {d["id"]: d for d in get_all_devices()}
+    device = devices.get(device_id)
+    if not device:
+        return jsonify({"ok": False, "message": "Dispositivo no encontrado"}), 404
+    if device["type"] != "ha_switch":
+        return jsonify({"ok": False, "message": "El dispositivo no es un switch"}), 400
+
+    from checks import toggle_ha_switch
+    ok, msg = toggle_ha_switch(device["entity_id"], action, timeout=8)
+    if not ok:
+        return jsonify({"ok": False, "message": msg})
+    return jsonify({"ok": True})
+
+
 @app.route("/api/ha-sensors")
 def api_ha_sensors():
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
@@ -121,6 +144,8 @@ def api_ha_sensors():
     sensors = [
         "sensor.system_monitor_temperatura_del_procesador",
         "sensor.system_monitor_uso_de_memoria_2",
+        "sensor.adguard_home_consultas_dns",
+        "sensor.adguard_home_proporcion_de_consultas_dns_bloqueadas",
     ]
     result = {}
     headers = {"Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}"}
@@ -154,6 +179,7 @@ def api_status():
         result.append({
             "id": s["device_id"],
             "name": s["name"],
+            "type": cfg.get("type"),
             "online": bool(s["online"]),
             "since_seconds": since_seconds,
             "since_human": humanize_duration(since_seconds),
@@ -162,6 +188,7 @@ def api_status():
             "response_ms": s.get("response_ms"),
             "maintenance_until": maintenance_until,
             "in_maintenance": maintenance_until > now,
+            "switch_state": s.get("switch_state"),
         })
     result.sort(key=lambda d: d["name"])
     return jsonify({"server_time": now, "devices": result})

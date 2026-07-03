@@ -1,68 +1,87 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>HomeM — Historial</title>
 <link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#0b0e0d">
+<meta name="theme-color" content="#0e0f13" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 <style>
-  :root {
-    --bg: #0b0e0d; --panel: #111513; --panel-border: #1f2723;
-    --text-primary: #e7ece9; --text-dim: #6f7d76;
-    --green: #3ddc84; --red: #ff5c5c; --amber: #ffb454;
-    --mono: "IBM Plex Mono","SF Mono",Consolas,monospace;
-    --sans: "Inter",-apple-system,sans-serif;
+  :root{
+    --accent:#0a84ff;--green:#34c759;--red:#ff3b30;--amber:#ff9500;
+    --surface:#0e0f13;
+    --text:#f5f5f7;--text-dim:#98989d;
+    --card-bg:rgba(255,255,255,.06);
+    --card-ring:rgba(255,255,255,.10);
+    --card-shadow:0 2px 8px rgba(0,0,0,.3),0 8px 28px rgba(0,0,0,.35);
+    --track:rgba(255,255,255,.08);
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Inter,sans-serif;
+    --mono:"SF Mono",ui-monospace,"IBM Plex Mono",Consolas,monospace;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg);
-    background-image: radial-gradient(circle at 15% 0%,rgba(61,220,132,0.05),transparent 40%);
-    color: var(--text-primary); font-family: var(--sans);
-    min-height: 100vh; padding: 28px 20px 60px;
+  [data-theme="light"]{
+    --surface:#f5f6f8;
+    --text:#1c1c1e;--text-dim:#6e6e73;
+    --card-bg:rgba(255,255,255,.82);
+    --card-ring:rgba(0,0,0,.05);
+    --card-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06);
+    --track:rgba(0,0,0,.06);
   }
-  .wrap { max-width: 880px; margin: 0 auto; }
-  header {
-    display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid var(--panel-border); padding-bottom: 16px; margin-bottom: 24px;
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;background:var(--surface);
+    background-image:
+      radial-gradient(circle at 15% -5%,color-mix(in srgb,var(--accent) 16%,transparent),transparent 45%),
+      radial-gradient(circle at 90% 0%,color-mix(in srgb,var(--accent) 8%,transparent),transparent 40%);
+    color:var(--text);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;letter-spacing:-.01em;
+    min-height:100dvh;padding:max(24px,env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom));
+    transition:background .3s,color .3s;
   }
-  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .18em;
-    text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
-  h1 { font-size: 20px; font-weight: 650; margin: 0; }
-  .back-btn {
-    font-family: var(--mono); font-size: 11px; color: var(--text-dim);
-    text-decoration: none; border: 1px solid var(--panel-border); border-radius: 6px;
-    padding: 5px 12px; transition: border-color .2s, color .2s;
+  .wrap{max-width:520px;margin:0 auto;}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;gap:10px;}
+  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);margin-bottom:2px;}
+  h1{font-size:30px;font-weight:700;margin:0;letter-spacing:-.03em;}
+  .icon-btn{
+    width:38px;height:38px;border-radius:999px;
+    background:var(--card-bg);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--card-ring);box-shadow:var(--card-shadow);
+    color:var(--text);display:inline-flex;align-items:center;justify-content:center;
+    cursor:pointer;text-decoration:none;transition:transform .12s,opacity .12s;
   }
-  .back-btn:hover { border-color: var(--green); color: var(--green); }
-  .incident-list { display: flex; flex-direction: column; gap: 6px; }
-  .incident {
-    display: grid; grid-template-columns: 10px 1fr auto;
-    align-items: center; gap: 14px;
-    background: var(--panel); border: 1px solid var(--panel-border);
-    border-radius: 8px; padding: 12px 16px;
+  .icon-btn:active{transform:scale(.88);opacity:.6;}
+  .icon-btn svg{width:19px;height:19px;stroke:currentColor;fill:none;}
+  .filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .filter-btn{
+    font-family:var(--sans);font-size:12px;font-weight:600;padding:8px 14px;
+    border:1px solid var(--card-ring);border-radius:999px;
+    background:var(--card-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    color:var(--text-dim);cursor:pointer;transition:color .15s,background .15s,transform .12s;
+    box-shadow:var(--card-shadow);
   }
-  .incident.down { border-left: 3px solid var(--red); }
-  .incident.up   { border-left: 3px solid var(--green); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .dot.down { background: var(--red); }
-  .dot.up   { background: var(--green); }
-  .incident-info .name { font-size: 14px; font-weight: 600; }
-  .incident-info .detail { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-  .incident-meta { text-align: right; font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
-  .duration { color: var(--amber); margin-top: 2px; }
-  .empty { text-align: center; font-family: var(--mono); font-size: 13px; color: var(--text-dim); padding: 60px 0; }
-  .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-  .filter-btn {
-    font-family: var(--mono); font-size: 11px; padding: 4px 12px;
-    border: 1px solid var(--panel-border); border-radius: 20px;
-    background: none; color: var(--text-dim); cursor: pointer;
-    transition: border-color .2s, color .2s;
+  .filter-btn:active{transform:scale(.95);}
+  .filter-btn.active{color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);}
+  .incident-list{display:flex;flex-direction:column;gap:10px;}
+  .incident{
+    display:grid;grid-template-columns:3px 1fr auto;align-items:center;gap:14px;
+    background:var(--card-bg);
+    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    border:1px solid var(--card-ring);border-radius:18px;
+    box-shadow:var(--card-shadow);padding:14px 16px;overflow:hidden;
   }
-  .filter-btn.active { border-color: var(--green); color: var(--green); background: rgba(61,220,132,.08); }
+  .incident-bar{width:3px;height:34px;border-radius:999px;align-self:center;}
+  .incident-bar.down{background:var(--red);}
+  .incident-bar.up{background:var(--green);}
+  .incident-info .name{font-size:15px;font-weight:600;letter-spacing:-.01em;}
+  .incident-info .detail{font-size:12px;color:var(--text-dim);margin-top:3px;}
+  .duration{color:var(--amber);margin-top:1px;font-weight:600;}
+  .incident-meta{text-align:right;font-family:var(--mono);font-size:11px;color:var(--text-dim);font-variant-numeric:tabular-nums;}
+  .empty{text-align:center;font-size:13px;color:var(--text-dim);padding:70px 0;}
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;}}
 </style>
 </head>
 <body>
@@ -70,15 +89,17 @@
   <header>
     <div>
       <div class="eyebrow">HomeM</div>
-      <h1>Historial de incidencias</h1>
+      <h1>Historial</h1>
     </div>
-    <a href="/" class="back-btn">← Panel</a>
+    <a href="/" class="icon-btn" title="Volver" aria-label="Volver al panel">
+      <svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </a>
   </header>
 
   <div class="filter-bar">
     <button class="filter-btn active" onclick="setFilter('all',this)">Todos</button>
-    <button class="filter-btn" onclick="setFilter('down',this)">Solo caídas</button>
-    <button class="filter-btn" onclick="setFilter('up',this)">Solo recuperaciones</button>
+    <button class="filter-btn" onclick="setFilter('down',this)">Caídas</button>
+    <button class="filter-btn" onclick="setFilter('up',this)">Recuperaciones</button>
   </div>
 
   <div class="incident-list" id="incident-list">
@@ -109,19 +130,17 @@ function renderIncidents() {
 
   list.innerHTML = filtered.map(i => {
     const cls = i.online ? 'up' : 'down';
-    const label = i.online ? '✅ Recuperado' : '🔴 Caída detectada';
-    const dur = (!i.online && i.duration) ? `<div class="duration">Duración: ${i.duration}</div>` : '';
+    const label = i.online ? 'Recuperado' : 'Caída detectada';
+    const dur = (!i.online && i.duration) ? `<div class="duration">Duración ${i.duration}</div>` : '';
     return `
-      <div class="incident ${cls}">
-        <div class="dot ${cls}"></div>
+      <div class="incident">
+        <div class="incident-bar ${cls}"></div>
         <div class="incident-info">
           <div class="name">${i.name}</div>
-          <div class="detail">${label}${dur ? '' : ''}</div>
+          <div class="detail">${label}</div>
           ${dur}
         </div>
-        <div class="incident-meta">
-          <div>${i.ts_human}</div>
-        </div>
+        <div class="incident-meta">${i.ts_human}</div>
       </div>`;
   }).join('');
 }
@@ -138,6 +157,8 @@ async function load() {
   }
 }
 
+const t = localStorage.getItem('homem_theme') || 'dark';
+document.documentElement.setAttribute('data-theme', t);
 load();
 </script>
 </body>
