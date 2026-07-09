@@ -200,33 +200,13 @@ def api_pi_stats():
     except Exception:
         uptime_human = None
 
-    # --- Docker container stats ---
+    # --- Docker stats (todos los contenedores) ---
     docker_stats = None
     try:
         import socket as sock
         import json as _json
 
         def docker_get(path):
-            s = sock.socket(sock.AF_UNIX, sock.SOCK_STREAM)
-            s.connect("/var/run/docker.sock")
-            req = f"GET {path} HTTP/1.0\r\nHost: localhost\r\n\r\n"
-            s.sendall(req.encode())
-            resp = b""
-            while True:
-                chunk = s.recv(4096)
-                if not chunk:
-                    break
-                resp += chunk
-            s.close()
-            body = resp.split(b"\r\n\r\n", 1)[1]
-            return _json.loads(body)
-
-        # Inspect container
-        info = docker_get("/containers/home-monitor/json")
-        status = info.get("State", {}).get("Status", "unknown")
-
-        # Stats (no-stream via ?stream=false)
-        def docker_get_stats(path):
             s = sock.socket(sock.AF_UNIX, sock.SOCK_STREAM)
             s.connect("/var/run/docker.sock")
             req = f"GET {path} HTTP/1.0\r\nHost: localhost\r\n\r\n"
@@ -241,51 +221,161 @@ def api_pi_stats():
             body = resp.split(b"\r\n\r\n", 1)[1]
             return _json.loads(body)
 
-        st = docker_get_stats("/containers/home-monitor/stats?stream=false")
-
-        # CPU %
-        cpu_delta = st["cpu_stats"]["cpu_usage"]["total_usage"] - st["precpu_stats"]["cpu_usage"]["total_usage"]
-        sys_delta  = st["cpu_stats"]["system_cpu_usage"] - st["precpu_stats"]["system_cpu_usage"]
-        num_cpus   = st["cpu_stats"].get("online_cpus", len(st["cpu_stats"]["cpu_usage"].get("percpu_usage", [1])))
-        docker_cpu = round(cpu_delta / sys_delta * num_cpus * 100, 1) if sys_delta > 0 else 0.0
-
-        # RAM — fallback a /proc si cgroups no disponibles
-        mem_usage_raw = st["memory_stats"].get("usage")
-        if mem_usage_raw:
-            mem_usage = mem_usage_raw - st["memory_stats"].get("stats", {}).get("cache", 0)
-            mem_limit = st["memory_stats"]["limit"]
-            docker_mem_mb    = round(mem_usage / 1048576, 1)
-            docker_mem_limit = round(mem_limit  / 1048576, 1)
-            mem_str = f"{docker_mem_mb}MB / {docker_mem_limit}MB"
-        else:
-            # Raspberry Pi sin memory cgroup: leer desde /proc del proceso principal
-            pid = info.get("State", {}).get("Pid", 0)
-            try:
-                with open(f"/proc/{pid}/status") as f:
-                    for line in f:
-                        if line.startswith("VmRSS:"):
-                            rss_kb = int(line.split()[1])
-                            mem_str = f"{round(rss_kb/1024,1)}MB"
-                            break
-                    else:
-                        mem_str = "n/a"
-            except Exception:
-                mem_str = "n/a"
-
-        # Network
-        net_rx = sum(v["rx_bytes"] for v in st.get("networks", {}).values())
-        net_tx = sum(v["tx_bytes"] for v in st.get("networks", {}).values())
         def fmt_bytes(b):
             return f"{round(b/1048576,1)}MB" if b >= 1048576 else f"{round(b/1024,1)}kB"
 
+        def get_container_stats(cid, pid):
+            try:
+                # Dos muestras separadas para CPU precisa
+                st1 = docker_get(f"/containers/{cid}/stats?stream=false")
+                time.sleep(0.3)
+                st2 = docker_get(f"/containers/{cid}/stats?stream=false")
+
+                cpu_delta = st2["cpu_stats"]["cpu_usage"]["total_usage"] - st1["cpu_stats"]["cpu_usage"]["total_usage"]
+                sys_delta = st2["cpu_stats"].get("system_cpu_usage", 0) - st1["cpu_stats"].get("system_cpu_usage", 0)
+                if sys_delta > 0 and cpu_delta >= 0:
+                    cpu_pct = round((cpu_delta / sys_delta) * 100, 1)
+                    cpu_pct = min(cpu_pct, 100.0)
+                else:
+                    cpu_pct = 0.0
+
+                # RAM
+                mem_usage_raw = st2["memory_stats"].get("usage")
+                if mem_usage_raw:
+                    mem_usage = mem_usage_raw - st2["memory_stats"].get("stats", {}).get("cache", 0)
+                    mem_str   = f"{round(mem_usage/1048576,1)}MB"
+                else:
+                    try:
+                        with open(f"/proc/{pid}/status") as fh:
+                            for line in fh:
+                                if line.startswith("VmRSS:"):
+                                    mem_str = f"{round(int(line.split()[1])/1024,1)}MB"
+                                    break
+                            else:
+                                mem_str = "n/a"
+                    except Exception:
+                        mem_str = "n/a"
+
+                # Red
+                net_rx = sum(v["rx_bytes"] for v in st2.get("networks", {}).values())
+                net_tx = sum(v["tx_bytes"] for v in st2.get("networks", {}).values())
+
+                # Disco (blkio)
+                blk_read = blk_write = 0
+                for item in st2.get("blkio_stats", {}).get("io_service_bytes_recursive", []) or []:
+                    if item["op"] == "read":  blk_read  = item["value"]
+                    if item["op"] == "write": blk_write = item["value"]
+
+                return {
+                    "cpu":       f"{cpu_pct}%",
+                    "mem":       mem_str,
+                    "net_rx":    fmt_bytes(net_rx),
+                    "net_tx":    fmt_bytes(net_tx),
+                    "blk_read":  fmt_bytes(blk_read),
+                    "blk_write": fmt_bytes(blk_write),
+                }
+            except Exception:
+                return {"cpu": "n/a", "mem": "n/a", "net_rx": "n/a", "net_tx": "n/a", "blk_read": "n/a", "blk_write": "n/a"}
+
+        # Listar todos los contenedores (running y stopped)
+        all_containers = docker_get("/containers/json?all=true")
+        containers = []
+        running_count = 0
+        for c in all_containers:
+            cid    = c["Id"]
+            name   = c["Names"][0].lstrip("/") if c.get("Names") else cid[:12]
+            status = c.get("State", "unknown")
+            pid    = 0
+            restart_count = 0
+            started_at    = ""
+            image_size    = ""
+
+            # Inspect para info extra
+            try:
+                info = docker_get(f"/containers/{cid}/json")
+                pid           = info.get("State", {}).get("Pid", 0)
+                restart_count = info.get("RestartCount", 0)
+                raw_start     = info.get("State", {}).get("StartedAt", "")[:19]
+                if raw_start and raw_start != "0001-01-01T00:00:00":
+                    started_at = raw_start.replace("T", " ")
+                # Tamano imagen
+                img_name = info.get("Config", {}).get("Image", "")
+                try:
+                    img_info   = docker_get(f"/images/{img_name}/json")
+                    img_bytes  = img_info.get("Size", 0)
+                    image_size = fmt_bytes(img_bytes)
+                except Exception:
+                    image_size = "n/a"
+            except Exception:
+                pass
+
+            if status == "running":
+                running_count += 1
+                stats = get_container_stats(cid, pid)
+            else:
+                stats = {"cpu": "—", "mem": "—", "net_rx": "—", "net_tx": "—", "blk_read": "—", "blk_write": "—"}
+
+            containers.append({
+                "name":          name,
+                "status":        status,
+                "cpu":           stats["cpu"],
+                "mem":           stats["mem"],
+                "net_rx":        stats["net_rx"],
+                "net_tx":        stats["net_tx"],
+                "blk_read":      stats["blk_read"],
+                "blk_write":     stats["blk_write"],
+                "image_size":    image_size,
+                "started_at":    started_at,
+                "restart_count": restart_count,
+            })
+
+        # Ordenar: portainer primero, luego running, luego alfabetico
+        def sort_key(x):
+            name_lower = x["name"].lower()
+            is_portainer = 0 if "portainer" in name_lower else 1
+            is_running   = 0 if x["status"] == "running" else 1
+            return (is_portainer, is_running, name_lower)
+        containers.sort(key=sort_key)
+
+        # Info global del sistema Docker
+        docker_version = "n/a"
+        disk_images_mb = disk_volumes_mb = 0
+        try:
+            info = docker_get("/info")
+            docker_version = info.get("ServerVersion", "n/a")
+        except Exception:
+            pass
+        try:
+            df = docker_get("/system/df")
+            disk_images_mb  = round(sum(i.get("Size", 0) for i in df.get("Images", [])) / 1048576, 1)
+            disk_volumes_mb = round(sum(v.get("UsageData", {}).get("Size", 0) for v in df.get("Volumes", [])) / 1048576, 1)
+        except Exception:
+            pass
+
+        # CPU y RAM totales sumadas de todos los contenedores
+        total_cpu_str = "n/a"
+        total_mem_mb  = 0
+        try:
+            cpu_vals = [float(c["cpu"].rstrip("%")) for c in containers if c["cpu"] not in ("n/a", "—")]
+            mem_vals = [float(c["mem"].rstrip("MB")) for c in containers if c["mem"] not in ("n/a", "—") and c["mem"].endswith("MB")]
+            total_cpu_str = f"{round(sum(cpu_vals), 1)}%"
+            total_mem_mb  = round(sum(mem_vals), 1)
+        except Exception:
+            pass
+
         docker_stats = {
-            "status": status,
-            "cpu": f"{docker_cpu}%",
-            "mem": mem_str,
-            "net": f"↓{fmt_bytes(net_rx)} ↑{fmt_bytes(net_tx)}",
+            "status":          "running" if running_count > 0 else "stopped",
+            "total":           len(containers),
+            "running":         running_count,
+            "version":         docker_version,
+            "disk_images_mb":  disk_images_mb,
+            "disk_volumes_mb": disk_volumes_mb,
+            "total_cpu":       total_cpu_str,
+            "total_mem_mb":    total_mem_mb,
+            "containers":      containers,
         }
     except Exception:
-        docker_stats = {"status": "unknown"}
+        docker_stats = {"status": "unknown", "total": 0, "running": 0, "containers": []}
 
     return jsonify({
         "cpu_pct": cpu_pct,
