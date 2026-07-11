@@ -373,6 +373,27 @@
         <div id="docker-containers-list"></div>
       </div></div>
     </div>
+
+    <!-- Video Scanner -->
+    <div class="device-row" id="sys-vscanner-row" draggable="true" data-id="sys-vscanner">
+      <div class="device-header" onclick="toggleSysCard('sys-vscanner-row')">
+        <div class="led on" id="vscanner-led"></div>
+        <div class="device-name-row"><span class="device-name">Video Scanner</span><span class="badge-maint" id="vscanner-new-badge" style="display:none;background:color-mix(in srgb,var(--amber) 12%,transparent);border-color:color-mix(in srgb,var(--amber) 35%,transparent);color:var(--amber);">0 nuevos</span></div>
+        <span class="status-pill up" id="vscanner-status">Online</span>
+        <span class="collapse-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+        <span class="drag-handle"><svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>
+      </div>
+      <div class="device-body"><div class="device-body-inner">
+        <div class="device-body-content">
+          <div class="device-left" id="vscanner-metrics"><div class="since-row">Conectando…</div></div>
+        </div>
+        <div class="device-actions" id="vscanner-actions">
+          <button class="act-btn" title="Escanear" onclick="vscannerScan()" id="vscanner-scan-btn"><svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+          <button class="act-btn" title="Descargar" onclick="vscannerDownload()" id="vscanner-dl-btn"><svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+          <span class="actions-hint" id="vscanner-hint"></span>
+        </div>
+      </div></div>
+    </div>
   </div>
 
   <div class="device-list" id="device-list"></div>
@@ -763,6 +784,9 @@ async function refresh(){
       renderDevices(data.devices);
       _firstRender=false;
     } else {
+      const missingDevice = data.devices.some(d => !document.querySelector(`.device-row[data-id="${d.id}"]`));
+      if(missingDevice){renderDevices(data.devices);}
+      else {
       data.devices.forEach(d=>{
         const row=document.querySelector(`.device-row[data-id="${d.id}"]`);
         if(!row)return;
@@ -803,6 +827,7 @@ async function refresh(){
           }
         }
       });
+      } // cierre else missingDevice
     }
     document.getElementById('footer-note').textContent=`Actualizado cada ${REFRESH_MS/1000}s · ${new Date(data.server_time*1000).toLocaleTimeString('es-ES')}`;
     loadHaSensors();
@@ -912,7 +937,7 @@ function saveSysCollapsed(m){localStorage.setItem(SYS_COLLAPSED_KEY,JSON.stringi
 function applySysCollapsedState(){
   // Por defecto aparecen PLEGADAS; si el usuario las desplegó, se respeta.
   const m=loadSysCollapsed();
-  ['sys-pi-row','sys-docker-row'].forEach(id=>{
+  ['sys-pi-row','sys-docker-row','sys-vscanner-row'].forEach(id=>{
     const r=document.getElementById(id);
     if(!r)return;
     const collapsed=(typeof m[id]==='boolean')?m[id]:true;
@@ -970,6 +995,63 @@ function urlBase64ToUint8Array(b64){
   return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
 }
 initPush();
+
+// ─────────── Video Scanner card ───────────
+const VSCANNER_URL='https://raspberrypi.tail08d292.ts.net:10000';
+
+async function loadVscannerStatus(){
+  const led=document.getElementById('vscanner-led');
+  const status=document.getElementById('vscanner-status');
+  const metrics=document.getElementById('vscanner-metrics');
+  const badge=document.getElementById('vscanner-new-badge');
+  const hint=document.getElementById('vscanner-hint');
+  try{
+    const r=await fetch(VSCANNER_URL+'/api/status',{signal:AbortSignal.timeout(5000)});
+    const data=await r.json();
+    if(led)led.className='led on';
+    if(status){status.className='status-pill up';status.textContent=data.scan.running?'Escaneando':'Online';}
+
+    const pending=data.downloads.pending+data.downloads.downloading;
+    const complete=data.downloads.complete;
+    const lastScan=data.lastScan?new Date(data.lastScan).toLocaleString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'Nunca';
+
+    if(metrics)metrics.innerHTML=`
+      <div class="sys-row"><span class="sys-label" style="width:auto;min-width:85px">Último escaneo</span><span class="sys-val" style="width:auto;color:var(--text)">${lastScan}</span></div>
+      <div class="sys-row"><span class="sys-label" style="width:auto;min-width:85px">URLs conocidas</span><span class="sys-val" style="width:auto;color:var(--text)">${data.totalKnown||0}</span></div>
+      <div class="sys-row"><span class="sys-label" style="width:auto;min-width:85px">Descargados</span><span class="sys-val" style="width:auto;color:var(--green)">${complete}</span></div>
+      <div class="sys-row"><span class="sys-label" style="width:auto;min-width:85px">Pendientes</span><span class="sys-val" style="width:auto;color:${pending?'var(--amber)':'var(--text-dim)'}">${pending}</span></div>
+      ${data.scan.running?`<div class="sys-row"><span class="sys-label" style="width:auto;min-width:85px">Progreso</span><span class="sys-val" style="width:auto;color:var(--accent)">${data.scan.progress}%</span></div>`:''}
+    `;
+    if(badge){
+      if(pending>0){badge.textContent=pending+' pendiente'+(pending>1?'s':'');badge.style.display='';}
+      else{badge.style.display='none';}
+    }
+    if(hint)hint.textContent=data.scan.running?'Escaneando…':'';
+  }catch(e){
+    if(led)led.className='led off';
+    if(status){status.className='status-pill down';status.textContent='Offline';}
+    if(metrics)metrics.innerHTML='<div class="since-row" style="color:var(--red)">No se pudo conectar</div>';
+    if(badge)badge.style.display='none';
+  }
+}
+
+async function vscannerScan(){
+  const hint=document.getElementById('vscanner-hint');
+  try{
+    await fetch(VSCANNER_URL+'/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({period:'7d'})});
+    if(hint)hint.textContent='Escaneo iniciado';
+  }catch{if(hint)hint.textContent='Error';}
+}
+async function vscannerDownload(){
+  const hint=document.getElementById('vscanner-hint');
+  try{
+    await fetch(VSCANNER_URL+'/api/downloads/start',{method:'POST'});
+    if(hint)hint.textContent='Descargas iniciadas';
+  }catch{if(hint)hint.textContent='Error';}
+}
+
+loadVscannerStatus();
+setInterval(loadVscannerStatus,15000);
 </script>
 </body>
 </html>
