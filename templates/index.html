@@ -110,7 +110,7 @@
     transition:opacity .2s,transform .2s,border-color .25s;
     user-select:none;-webkit-user-select:none;
   }
-  .device-row.is-down{border-color:rgba(255,59,48,.4);}
+  .device-row.is-down{border-color:rgba(255,59,48,.4);visibility:visible;opacity:1;}
   .device-row.protection-off{border-color:rgba(255,149,0,.38);}
   .device-row.dragging{opacity:.4;}
   .device-row.drag-over{transform:scale(1.015);border-color:var(--accent);}
@@ -338,6 +338,11 @@
     </div>
   </header>
   <div class="summary-bar" id="summary-bar"><div class="chip"><span class="dot"></span>Cargando…</div></div>
+  <div class="summary-bar" id="filter-bar" style="margin-bottom:12px;">
+    <button class="chip" data-filter="all" onclick="setFilter('all')" id="filter-all" style="cursor:pointer;border:1px solid var(--accent);color:var(--accent);">Todos</button>
+    <button class="chip" data-filter="online" onclick="setFilter('online')" id="filter-online" style="cursor:pointer;">Online</button>
+    <button class="chip" data-filter="offline" onclick="setFilter('offline')" id="filter-offline" style="cursor:pointer;">Offline</button>
+  </div>
   <!-- Tarjetas de sistema: Raspberry Pi + Docker (estáticas, datos de /api/pi-stats) -->
   <div class="device-list" id="sys-list" style="margin-bottom:12px">
     <!-- Raspberry Pi -->
@@ -776,6 +781,25 @@ async function forceCheck(){
 
 let _firstRender=true;
 
+// Filtro Todos/Online/Offline
+let currentFilter='all';
+function setFilter(f){
+  currentFilter=f;
+  document.querySelectorAll('#filter-bar .chip').forEach(btn=>{
+    btn.style.border=btn.dataset.filter===f?'1px solid var(--accent)':'1px solid var(--card-ring)';
+    btn.style.color=btn.dataset.filter===f?'var(--accent)':'var(--text-dim)';
+  });
+  applyFilter();
+}
+function applyFilter(){
+  document.querySelectorAll('#device-list .device-row').forEach(row=>{
+    const isDown=row.classList.contains('is-down');
+    if(currentFilter==='all'){row.style.display='';}
+    else if(currentFilter==='online'){row.style.display=isDown?'none':'';}
+    else if(currentFilter==='offline'){row.style.display=isDown?'':'none';}
+  });
+}
+
 async function refresh(){
   try{
     const data=await(await fetch('/api/status')).json();
@@ -831,6 +855,7 @@ async function refresh(){
     }
     document.getElementById('footer-note').textContent=`Actualizado cada ${REFRESH_MS/1000}s · ${new Date(data.server_time*1000).toLocaleTimeString('es-ES')}`;
     loadHaSensors();
+    applyFilter();
   }catch{document.getElementById('footer-note').textContent='Sin conexion. Reintentando…';}
 }
 refresh();setInterval(refresh,REFRESH_MS);
