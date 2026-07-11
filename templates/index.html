@@ -524,7 +524,11 @@ const ICONS={
 
 // Render de tarjetas
 function renderDevices(devices){
-  const ordered=applyOrder(devices),collapsed=loadCollapsed();
+  // Offline SIEMPRE primero, luego el resto ordenados
+  const offline=devices.filter(d=>!d.online);
+  const online=devices.filter(d=>d.online);
+  const ordered=[...offline,...applyOrder(online)];
+  const collapsed=loadCollapsed();
   const list=document.getElementById('device-list');
   list.innerHTML=ordered.map(d=>{
     const lc=d.online?'on':'off';
@@ -781,8 +785,6 @@ async function forceCheck(){
   setTimeout(()=>{refresh();btn.disabled=false;btn.style.opacity='';}, 2000);
 }
 
-let _firstRender=true;
-
 // Filtro Todos/Online/Offline
 let currentFilter='all';
 function setFilter(f){
@@ -810,55 +812,7 @@ async function refresh(){
   try{
     const data=await(await fetch('/api/status')).json();
     renderSummary(data.devices);
-    if(_firstRender){
-      renderDevices(data.devices);
-      _firstRender=false;
-    } else {
-      const missingDevice = data.devices.some(d => !document.querySelector(`.device-row[data-id="${d.id}"]`));
-      if(missingDevice){renderDevices(data.devices);}
-      else {
-      data.devices.forEach(d=>{
-        const row=document.querySelector(`.device-row[data-id="${d.id}"]`);
-        if(!row)return;
-        const led=row.querySelector('.led');
-        if(led){led.className='led '+(d.online?'on':'off');}
-        row.classList.toggle('is-down',!d.online);
-        const si=row.querySelector('.status-pill');
-        if(si){si.className='status-pill '+(d.online?'up':'down');si.textContent=d.online?'Online':'Offline';}
-        const sr=row.querySelector('.since-row');
-        if(sr)sr.textContent=d.online?`${d.since_human} en línea`:`caído hace ${d.since_human}`;
-        // Reflejar protección desactivada (AdGuard) en el borde de la tarjeta
-        row.classList.toggle('protection-off', d.type==='ha_switch' && d.switch_state==='off');
-        const dr=row.querySelector('.device-right');
-        if(dr){
-          const lh=dr.querySelector('.latency');
-          const newLh=document.createElement('div');
-          newLh.innerHTML=latencyHtml(d.response_ms);
-          if(lh)lh.replaceWith(newLh.firstChild||lh);
-          else if(newLh.firstChild)dr.prepend(newLh.firstChild);
-        }
-        const nameRow=row.querySelector('.device-name-row');
-        const oldBadge=nameRow&&nameRow.querySelector('.badge-maint');
-        if(nameRow){
-          if(d.in_maintenance&&!oldBadge){
-            const b=document.createElement('span');b.className='badge-maint';b.textContent='Mant.';nameRow.appendChild(b);
-          } else if(!d.in_maintenance&&oldBadge){oldBadge.remove();}
-        }
-        const mb=row.querySelector('.act-btn.maint');
-        if(mb){mb.classList.toggle('active',d.in_maintenance);mb.onclick=()=>toggleMaintenance(d.id,d.in_maintenance);}
-        // Estado del switch — sin sobrescribir mientras el usuario interactúa
-        if(d.type==='ha_switch' && d.switch_state!=null){
-          const input=row.querySelector('#switch-input-'+CSS.escape(d.id));
-          const st=row.querySelector('#switch-status-'+CSS.escape(d.id));
-          if(input && document.activeElement!==input) input.checked=(d.switch_state==='on');
-          if(st){
-            st.textContent=d.switch_state==='on'?'Activado':'Desactivado';
-            st.className='switch-status-label '+(d.switch_state==='on'?'on':'off');
-          }
-        }
-      });
-      } // cierre else missingDevice
-    }
+    renderDevices(data.devices);
     document.getElementById('footer-note').textContent=`Actualizado cada ${REFRESH_MS/1000}s · ${new Date(data.server_time*1000).toLocaleTimeString('es-ES')}`;
     loadHaSensors();
     applyFilter();
@@ -866,6 +820,14 @@ async function refresh(){
 }
 refresh();setInterval(refresh,REFRESH_MS);
 setInterval(loadPiStats, 15000); loadPiStats(); applySysCollapsedState();
+
+// Pull-to-refresh
+let touchStartY=0;
+document.addEventListener('touchstart',e=>{touchStartY=e.touches[0].clientY;},{passive:true});
+document.addEventListener('touchend',e=>{
+  const diff=e.changedTouches[0].clientY-touchStartY;
+  if(diff>120 && window.scrollY===0){refresh();loadPiStats();}
+},{passive:true});
 
 function toggleSysCard(rowId){
   const row=document.getElementById(rowId);
