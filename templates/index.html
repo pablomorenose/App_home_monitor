@@ -106,11 +106,10 @@
     border:1px solid var(--card-ring);
     border-radius:22px;
     box-shadow:var(--card-shadow);
-    overflow:hidden;
     transition:opacity .2s,transform .2s,border-color .25s;
     user-select:none;-webkit-user-select:none;
   }
-  .device-row.is-down{border-color:rgba(255,59,48,.4);visibility:visible;opacity:1;}
+  .device-row.is-down{border-color:rgba(255,59,48,.4);}
   .device-row.protection-off{border-color:rgba(255,149,0,.38);}
   .device-row.dragging{opacity:.4;}
   .device-row.drag-over{transform:scale(1.015);border-color:var(--accent);}
@@ -524,10 +523,7 @@ const ICONS={
 
 // Render de tarjetas
 function renderDevices(devices){
-  // Offline SIEMPRE primero, luego el resto ordenados
-  const offline=devices.filter(d=>!d.online);
-  const online=devices.filter(d=>d.online);
-  const ordered=[...offline,...applyOrder(online)];
+  const ordered=applyOrder(devices);
   const collapsed=loadCollapsed();
   const list=document.getElementById('device-list');
   list.innerHTML=ordered.map(d=>{
@@ -542,8 +538,6 @@ function renderDevices(devices){
     const rc=(d.online?'':'is-down')+(isCollapsed?' collapsed':'')+(protectionOff?' protection-off':'');
     const sc=d.online?'up':'down';
     const sl=d.online?'Online':'Offline';
-    // Forzar estilo inline para offline (fix Safari iOS)
-    const offlineStyle = d.online ? '' : 'style="display:block!important;visibility:visible!important;opacity:1!important;border:2px solid rgba(255,59,48,.6)!important;min-height:60px!important;"';
     const since=d.online?`${d.since_human} en línea`:`caído hace ${d.since_human}`;
     const maintBadge=d.in_maintenance?`<span class="badge-maint">Mant.</span>`:'';
     const haSensors=d.id==='home_assistant'?`<div id="ha-sensors" class="ha-sensors"></div>`:'';
@@ -568,7 +562,7 @@ function renderDevices(devices){
         </div>
       </div>` : '';
 
-    return`<div class="device-row ${rc}" ${offlineStyle} draggable="true" data-id="${d.id}">
+    return`<div class="device-row ${rc}" draggable="true" data-id="${d.id}">
       <div class="device-header">
         <div class="led ${lc}"></div>
         <div class="device-name-row">
