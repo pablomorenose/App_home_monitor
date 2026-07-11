@@ -110,6 +110,7 @@
     user-select:none;-webkit-user-select:none;
   }
   .device-row.is-down{border-color:rgba(255,59,48,.4);}
+  .device-row{contain:none!important;content-visibility:visible!important;}
   .device-row.protection-off{border-color:rgba(255,149,0,.38);}
   .device-row.dragging{opacity:.4;}
   .device-row.drag-over{transform:scale(1.015);border-color:var(--accent);}
@@ -566,7 +567,7 @@ function renderDevices(devices){
       <div class="device-header">
         <div class="led ${lc}"></div>
         <div class="device-name-row">
-          <span class="device-name">${d.name}</span>
+          <span class="device-name">${d.name.replace(/[Cc]amera/g,m=>m[0]+'am\u200Bera').replace(/[Cc]ámara/g,m=>m[0]+'ám\u200Bara')}</span>
           ${maintBadge}
         </div>
         <span class="status-pill ${sc}">${sl}</span>
@@ -578,7 +579,7 @@ function renderDevices(devices){
         <div class="device-body-content">
           <div class="device-left">
             <div class="since-row">${since}</div>
-            ${d.last_error?`<div class="error-text">${d.last_error}</div>`:''}
+            ${d.last_error?`<div class="error-text">${d.last_error.replace(/camera/gi,m=>m[0]+'am\u200Bera')}</div>`:''}
             ${haSensors}
             ${extraSensors}
             ${sparklineHtml(d.id)}
