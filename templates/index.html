@@ -534,7 +534,7 @@ function renderDevices(devices){
     // El interruptor de AdGuard vive fuera del cuerpo plegable, así que sigue visible.
     // Si el usuario ya tiene preferencia guardada, se respeta.
     const defaultCollapsed = (d.type==='ha_switch');
-    const isCollapsed = (typeof collapsed[d.id]==='boolean') ? collapsed[d.id] : defaultCollapsed;
+    const isCollapsed = d.online ? ((typeof collapsed[d.id]==='boolean') ? collapsed[d.id] : defaultCollapsed) : false;
     const rc=(d.online?'':'is-down')+(isCollapsed?' collapsed':'')+(protectionOff?' protection-off':'');
     const sc=d.online?'up':'down';
     const sl=d.online?'Online':'Offline';
@@ -543,7 +543,7 @@ function renderDevices(devices){
     const haSensors=d.id==='home_assistant'?`<div id="ha-sensors" class="ha-sensors"></div>`:'';
     const extraSensors=(d.id==='adguard')?`<div id="adguard-sensors" class="ha-sensors"></div>`:'';
 
-    // Fila PROTECCIÓN para ha_switch (siempre visible, debajo de la cabecera)
+    // Fila PROTECCIÓN para ha_switch (dentro del body desplegable)
     const switchRow = (d.type==='ha_switch') ? `
       <div class="switch-row">
         <div class="switch-info">
@@ -573,8 +573,8 @@ function renderDevices(devices){
         <span class="collapse-btn">${ICONS.chevron}</span>
         <span class="drag-handle">${ICONS.grip}</span>
       </div>
-      ${switchRow}
       <div class="device-body"><div class="device-body-inner">
+        ${switchRow}
         <div class="device-body-content">
           <div class="device-left">
             <div class="since-row">${since}</div>
@@ -799,6 +799,9 @@ function applyFilter(){
     else if(currentFilter==='online'){row.style.display=isDown?'none':'';}
     else if(currentFilter==='offline'){row.style.display=isDown?'':'none';}
   });
+  // Ocultar tarjetas de sistema en filtro offline (no son dispositivos monitorizados)
+  const sysList=document.getElementById('sys-list');
+  if(sysList) sysList.style.display=(currentFilter==='offline')?'none':'';
 }
 
 async function refresh(){
