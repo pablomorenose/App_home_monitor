@@ -526,9 +526,6 @@ const ICONS={
 function renderDevices(devices){
   const ordered=applyOrder(devices),collapsed=loadCollapsed();
   const list=document.getElementById('device-list');
-  // Debug: mostrar cuántos dispositivos y cuáles son offline
-  const offlineDevs=devices.filter(d=>!d.online);
-  document.getElementById('footer-note').textContent=`Renderizando ${devices.length} dispositivos (${offlineDevs.length} offline: ${offlineDevs.map(d=>d.name).join(', ')})`;
   list.innerHTML=ordered.map(d=>{
     const lc=d.online?'on':'off';
     // AdGuard con protección desactivada: tono diferenciado (ámbar) aunque esté online
@@ -541,6 +538,8 @@ function renderDevices(devices){
     const rc=(d.online?'':'is-down')+(isCollapsed?' collapsed':'')+(protectionOff?' protection-off':'');
     const sc=d.online?'up':'down';
     const sl=d.online?'Online':'Offline';
+    // Forzar estilo inline para offline (fix Safari iOS)
+    const offlineStyle = d.online ? '' : 'style="display:block!important;visibility:visible!important;opacity:1!important;border:2px solid rgba(255,59,48,.6)!important;min-height:60px!important;"';
     const since=d.online?`${d.since_human} en línea`:`caído hace ${d.since_human}`;
     const maintBadge=d.in_maintenance?`<span class="badge-maint">Mant.</span>`:'';
     const haSensors=d.id==='home_assistant'?`<div id="ha-sensors" class="ha-sensors"></div>`:'';
@@ -565,7 +564,7 @@ function renderDevices(devices){
         </div>
       </div>` : '';
 
-    return`<div class="device-row ${rc}" draggable="true" data-id="${d.id}">
+    return`<div class="device-row ${rc}" ${offlineStyle} draggable="true" data-id="${d.id}">
       <div class="device-header">
         <div class="led ${lc}"></div>
         <div class="device-name-row">
