@@ -84,6 +84,30 @@ def init_db():
                 ADD COLUMN IF NOT EXISTS maintenance_until DOUBLE PRECISION NOT NULL DEFAULT 0
             """)
 
+            # ─── Phase 2 migrations: monitor config columns on devices ───
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS check_interval INTEGER NOT NULL DEFAULT 15")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS timeout INTEGER NOT NULL DEFAULT 8")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS max_retries INTEGER NOT NULL DEFAULT 3")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS retry_interval INTEGER NOT NULL DEFAULT 5")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS recovery_threshold INTEGER NOT NULL DEFAULT 1")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS expected_status_codes TEXT NOT NULL DEFAULT '200-399'")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS http_method TEXT NOT NULL DEFAULT 'GET'")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS http_headers TEXT NOT NULL DEFAULT '{}'")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS http_body TEXT NOT NULL DEFAULT ''")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS verify_keyword TEXT NOT NULL DEFAULT ''")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS tls_warn_days INTEGER NOT NULL DEFAULT 14")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS depends_on TEXT NOT NULL DEFAULT ''")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS tags TEXT NOT NULL DEFAULT ''")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS follow_redirects INTEGER NOT NULL DEFAULT 1")
+            cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS latency_threshold INTEGER NOT NULL DEFAULT 0")
+
+            # ─── Phase 2 migrations: state machine columns on device_status ───
+            cur.execute("ALTER TABLE device_status ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT 'pending'")
+            cur.execute("ALTER TABLE device_status ADD COLUMN IF NOT EXISTS consecutive_failures INTEGER NOT NULL DEFAULT 0")
+            cur.execute("ALTER TABLE device_status ADD COLUMN IF NOT EXISTS consecutive_successes INTEGER NOT NULL DEFAULT 0")
+            cur.execute("ALTER TABLE device_status ADD COLUMN IF NOT EXISTS last_notification_ts DOUBLE PRECISION NOT NULL DEFAULT 0")
+            cur.execute("ALTER TABLE device_status ADD COLUMN IF NOT EXISTS incident_id TEXT")
+
 
 # -----------------------------------------------------------------------
 # Gestión de dispositivos (tabla devices)
@@ -242,6 +266,221 @@ def cleanup_old_history(days: int = 30):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM status_history WHERE ts < %s", (cutoff,))
+
+
+# -----------------------------------------------------------------------
+# Gestión de monitores (Phase 2 — vista extendida de devices)
+# -----------------------------------------------------------------------
+
+_MONITOR_COLUMNS = (
+    "id", "name", "type", "config_json", "enabled", "created_at",
+    "maintenance_until", "check_interval", "timeout", "max_retries",
+    "retry_interval", "recovery_threshold", "expected_status_codes",
+    "http_method", "http_headers", "http_body", "verify_keyword",
+    "tls_warn_days", "depends_on", "tags", "follow_redirects", "latency_threshold",
+)
+
+
+def get_all_monitors() -> list[dict]:
+    """Devuelve todos los monitores con campos extendidos."""
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"""
+                SELECT {', '.join(_MONITOR_COLUMNS)}
+                FROM devices
+                ORDER BY created_at
+            """)
+            rows = cur.fetchall()
+            result = []
+            for row in rows:
+                d = dict(row)
+                # Merge config_json into the dict
+                config = json.loads(d.pop("config_json", "{}"))
+                d.update(config)
+                result.append(d)
+            return result
+
+
+def get_monitor(monitor_id: str) -> dict | None:
+    """Devuelve un monitor por su ID."""
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"""
+                SELECT {', '.join(_MONITOR_COLUMNS)}
+                FROM devices WHERE id = %s
+            """, (monitor_id,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            config = json.loads(d.pop("config_json", "{}"))
+            d.update(config)
+            return d
+
+
+def upsert_monitor(monitor: dict):
+    """Crea o actualiza un monitor con todos los campos extendidos."""
+    base_fields = {
+        "id", "name", "type", "enabled", "created_at",
+        "check_interval", "timeout", "max_retries", "retry_interval",
+        "recovery_threshold", "expected_status_codes", "http_method",
+        "http_headers", "http_body", "verify_keyword", "tls_warn_days",
+        "depends_on", "tags", "follow_redirects", "latency_threshold",
+        "maintenance_until",
+    }
+    config = {k: v for k, v in monitor.items() if k not in base_fields}
+    now = time.time()
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO devices (
+                    id, name, type, config_json, enabled, created_at,
+                    check_interval, timeout, max_retries, retry_interval,
+                    recovery_threshold, expected_status_codes, http_method,
+                    http_headers, http_body, verify_keyword, tls_warn_days,
+                    depends_on, tags, follow_redirects, latency_threshold,
+                    maintenance_until
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s
+                )
+                ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    type = EXCLUDED.type,
+                    config_json = EXCLUDED.config_json,
+                    check_interval = EXCLUDED.check_interval,
+                    timeout = EXCLUDED.timeout,
+                    max_retries = EXCLUDED.max_retries,
+                    retry_interval = EXCLUDED.retry_interval,
+                    recovery_threshold = EXCLUDED.recovery_threshold,
+                    expected_status_codes = EXCLUDED.expected_status_codes,
+                    http_method = EXCLUDED.http_method,
+                    http_headers = EXCLUDED.http_headers,
+                    http_body = EXCLUDED.http_body,
+                    verify_keyword = EXCLUDED.verify_keyword,
+                    tls_warn_days = EXCLUDED.tls_warn_days,
+                    depends_on = EXCLUDED.depends_on,
+                    tags = EXCLUDED.tags,
+                    follow_redirects = EXCLUDED.follow_redirects,
+                    latency_threshold = EXCLUDED.latency_threshold,
+                    maintenance_until = EXCLUDED.maintenance_until
+            """, (
+                monitor["id"],
+                monitor["name"],
+                monitor["type"],
+                json.dumps(config),
+                monitor.get("enabled", 1),
+                monitor.get("created_at", now),
+                monitor.get("check_interval", 15),
+                monitor.get("timeout", 8),
+                monitor.get("max_retries", 3),
+                monitor.get("retry_interval", 5),
+                monitor.get("recovery_threshold", 1),
+                monitor.get("expected_status_codes", "200-399"),
+                monitor.get("http_method", "GET"),
+                monitor.get("http_headers", "{}"),
+                monitor.get("http_body", ""),
+                monitor.get("verify_keyword", ""),
+                monitor.get("tls_warn_days", 14),
+                monitor.get("depends_on", ""),
+                monitor.get("tags", ""),
+                monitor.get("follow_redirects", 1),
+                monitor.get("latency_threshold", 0),
+                monitor.get("maintenance_until", 0),
+            ))
+
+
+def get_monitor_statuses() -> list[dict]:
+    """Devuelve todos los estados incluyendo campos de state machine."""
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT device_id, name, online, last_change_ts, last_check_ts,
+                       last_error, response_ms, switch_state,
+                       state, consecutive_failures, consecutive_successes,
+                       last_notification_ts, incident_id
+                FROM device_status
+            """)
+            return [dict(row) for row in cur.fetchall()]
+
+
+def update_monitor_status(device_id: str, name: str, online: bool,
+                          error: str | None = None, response_ms: int | None = None,
+                          switch_state: str | None = None,
+                          state: str = "pending",
+                          consecutive_failures: int = 0,
+                          consecutive_successes: int = 0,
+                          last_notification_ts: float = 0,
+                          incident_id: str | None = None):
+    """Actualiza el estado del monitor con campos de state machine."""
+    now = time.time()
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT online, last_change_ts FROM device_status WHERE device_id = %s",
+                (device_id,),
+            )
+            row = cur.fetchone()
+
+            if row is None:
+                cur.execute("""
+                    INSERT INTO device_status
+                    (device_id, name, online, last_change_ts, last_check_ts,
+                     last_error, response_ms, switch_state,
+                     state, consecutive_failures, consecutive_successes,
+                     last_notification_ts, incident_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (device_id, name, int(online), now, now, error, response_ms,
+                      switch_state, state, consecutive_failures, consecutive_successes,
+                      last_notification_ts, incident_id))
+            else:
+                changed = bool(row["online"]) != online
+                last_change_ts = now if changed else row["last_change_ts"]
+                cur.execute("""
+                    UPDATE device_status
+                    SET name = %s, online = %s, last_change_ts = %s,
+                        last_check_ts = %s, last_error = %s, response_ms = %s,
+                        switch_state = %s, state = %s,
+                        consecutive_failures = %s, consecutive_successes = %s,
+                        last_notification_ts = %s, incident_id = %s
+                    WHERE device_id = %s
+                """, (name, int(online), last_change_ts, now, error, response_ms,
+                      switch_state, state, consecutive_failures, consecutive_successes,
+                      last_notification_ts, incident_id, device_id))
+
+            # Always record history
+            cur.execute(
+                "INSERT INTO status_history (device_id, online, ts, response_ms) VALUES (%s, %s, %s, %s)",
+                (device_id, int(online), now, response_ms),
+            )
+
+
+def update_heartbeat_ts(monitor_id: str):
+    """Actualiza last_check_ts para un monitor de tipo heartbeat."""
+    now = time.time()
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            # Use last_check_ts as the heartbeat ping timestamp
+            cur.execute("""
+                UPDATE device_status
+                SET last_check_ts = %s
+                WHERE device_id = %s
+            """, (now, monitor_id))
+            # If no row exists yet, create one
+            if cur.rowcount == 0:
+                cur.execute("""
+                    INSERT INTO device_status
+                    (device_id, name, online, last_change_ts, last_check_ts,
+                     last_error, response_ms, switch_state, state,
+                     consecutive_failures, consecutive_successes,
+                     last_notification_ts, incident_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (monitor_id, monitor_id, 1, now, now, None, None, None,
+                      'up', 0, 1, 0, None))
 
 
 def get_incidents(limit: int = 100) -> list[dict]:

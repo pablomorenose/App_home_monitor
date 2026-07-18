@@ -30,9 +30,11 @@ from config import (
 from csrf import get_csrf_token, csrf_protect
 from db import (delete_device, get_all_devices, get_all_statuses, get_history,
                 init_db, seed_devices_from_config, upsert_device, get_latency_history,
-                get_incidents)
+                get_incidents, get_all_monitors, get_monitor, upsert_monitor,
+                get_monitor_statuses, update_heartbeat_ts)
 from monitor_worker import run_checks_once, start_background_monitor
 from notifications import delete_subscription, init_push_table, save_subscription
+from validators import validate_monitor
 
 # Validar configuración antes de arrancar
 validate_config()
@@ -627,6 +629,106 @@ def edit_device(device_id):
 def remove_device(device_id):
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
     delete_device(device_id)
+    return jsonify({"ok": True})
+
+
+# -----------------------------------------------------------------------
+# API de Monitores (Phase 2 — campos extendidos)
+# -----------------------------------------------------------------------
+
+@app.route("/api/monitors", methods=["GET"])
+def list_monitors():
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    monitors = get_all_monitors()
+    statuses = {s["device_id"]: s for s in get_monitor_statuses()}
+    now = time.time()
+    result = []
+    for m in monitors:
+        status = statuses.get(m["id"], {})
+        result.append({
+            **m,
+            "state": status.get("state", "pending"),
+            "online": bool(status.get("online", 0)),
+            "last_check_ts": status.get("last_check_ts"),
+            "last_error": status.get("last_error"),
+            "response_ms": status.get("response_ms"),
+            "consecutive_failures": status.get("consecutive_failures", 0),
+            "consecutive_successes": status.get("consecutive_successes", 0),
+            "incident_id": status.get("incident_id"),
+            "in_maintenance": m.get("maintenance_until", 0) > now,
+        })
+    return jsonify({"monitors": result})
+
+
+@app.route("/api/monitors/<monitor_id>", methods=["GET"])
+def get_monitor_detail(monitor_id):
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    m = get_monitor(monitor_id)
+    if not m:
+        return jsonify({"error": "Monitor no encontrado"}), 404
+    statuses = {s["device_id"]: s for s in get_monitor_statuses()}
+    status = statuses.get(monitor_id, {})
+    now = time.time()
+    result = {
+        **m,
+        "state": status.get("state", "pending"),
+        "online": bool(status.get("online", 0)),
+        "last_check_ts": status.get("last_check_ts"),
+        "last_error": status.get("last_error"),
+        "response_ms": status.get("response_ms"),
+        "consecutive_failures": status.get("consecutive_failures", 0),
+        "consecutive_successes": status.get("consecutive_successes", 0),
+        "incident_id": status.get("incident_id"),
+        "in_maintenance": m.get("maintenance_until", 0) > now,
+    }
+    return jsonify(result)
+
+
+@app.route("/api/monitors", methods=["POST"])
+@csrf_protect
+def add_monitor():
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Sin datos"}), 400
+    errors = validate_monitor(data)
+    if errors:
+        return jsonify({"error": "Validación fallida", "details": errors}), 400
+    upsert_monitor(data)
+    return jsonify({"ok": True}), 201
+
+
+@app.route("/api/monitors/<monitor_id>", methods=["PUT"])
+@csrf_protect
+def edit_monitor(monitor_id):
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Sin datos"}), 400
+    data["id"] = monitor_id
+    errors = validate_monitor(data)
+    if errors:
+        return jsonify({"error": "Validación fallida", "details": errors}), 400
+    upsert_monitor(data)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/monitors/<monitor_id>", methods=["DELETE"])
+@csrf_protect
+def remove_monitor(monitor_id):
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    delete_device(monitor_id)
+    return jsonify({"ok": True})
+
+
+# -----------------------------------------------------------------------
+# Heartbeat endpoint (Phase 2)
+# -----------------------------------------------------------------------
+
+@app.route("/api/heartbeat/<monitor_id>", methods=["POST"])
+def api_heartbeat(monitor_id):
+    """Receives a heartbeat ping from an external service."""
+    update_heartbeat_ts(monitor_id)
     return jsonify({"ok": True})
 
 
