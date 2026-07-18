@@ -1,5 +1,10 @@
 """
 Gestión de suscripciones push y envío de notificaciones Web Push.
+
+DEPRECATED: Este módulo se mantiene por compatibilidad.
+Use alerts.py para enviar notificaciones multi-canal (send_alert).
+Las funciones de gestión de suscripciones (save_subscription, delete_subscription, etc.)
+siguen siendo necesarias y se usan desde alerts.py y app.py.
 """
 
 import json

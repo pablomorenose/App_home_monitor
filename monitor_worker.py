@@ -9,6 +9,11 @@ Phase 2:
 - State machine integration: process_check_result for each monitor
 - Heartbeat support: POST /api/heartbeat/<id> updates last_ping_ts
 
+Phase 3:
+- Uses alerts.send_alert() for multi-channel notifications
+- Passes event_type based on state transition
+- Includes downtime duration on recovery alerts
+
 Backward compatible: run_checks_once() still works for the old flow.
 """
 
@@ -17,6 +22,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from alerts import send_alert
 from checks import check_device, check_monitor
 from config import CHECK_INTERVAL_SECONDS, MAX_CHECK_WORKERS, PUSH_ENABLED
 from db import (
@@ -24,6 +30,7 @@ from db import (
     get_all_statuses,
     update_status,
     cleanup_old_history,
+    cleanup_detailed_history,
     get_all_monitors,
     get_monitor_statuses,
     update_monitor_status,
@@ -164,13 +171,30 @@ def run_monitor_cycle():
             for future in as_completed(futures):
                 try:
                     monitor, state_info, result = future.result()
-                    # Send notifications if needed
-                    if PUSH_ENABLED:
-                        if state_info["should_notify_down"]:
-                            reason = result.get("message", "")
-                            _notify_change(monitor["name"], False, reason)
-                        elif state_info["should_notify_recovery"]:
-                            _notify_change(monitor["name"], True, None)
+                    # Send alerts based on state transition
+                    if state_info["should_notify_down"]:
+                        event_type = "degraded" if state_info["state"] == "degraded" else "down"
+                        send_alert(event_type, monitor, {
+                            "message": result.get("message", "No response"),
+                            "state": state_info["state"],
+                        })
+                    elif state_info["should_notify_recovery"]:
+                        # Calculate downtime duration
+                        status = status_by_id.get(monitor["id"], {})
+                        last_change = float(status.get("last_change_ts", 0))
+                        duration_secs = time.time() - last_change if last_change else 0
+                        duration_str = _humanize_duration(duration_secs)
+                        send_alert("recovery", monitor, {
+                            "duration": duration_str,
+                            "state": "up",
+                        })
+                    # Check for TLS expiring (from check result details)
+                    tls_days = result.get("details", {}).get("tls_days_remaining")
+                    if tls_days is not None and tls_days <= monitor.get("tls_warn_days", 14):
+                        send_alert("tls_expiring", monitor, {
+                            "days": tls_days,
+                            "state": state_info["state"],
+                        })
                 except Exception as e:
                     logger.error("Error procesando monitor: %s", e)
 
@@ -187,23 +211,42 @@ def run_monitor_cycle():
         _cycle_lock.release()
 
 
+def _humanize_duration(seconds: float) -> str:
+    """Format seconds into a human-readable duration string."""
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds}s"
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, _ = divmod(rem, 60)
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes and not days:
+        parts.append(f"{minutes}min")
+    if not parts:
+        parts.append(f"{seconds}s")
+    return " ".join(parts)
+
+
 def _notify_change(name: str, online: bool, error: str | None):
-    """Send push notification for state change."""
+    """Send alert for state change (used by legacy run_checks_once flow)."""
     try:
-        from notifications import send_push
+        monitor = {"id": name, "name": name}
         if online:
-            send_push(
-                title="✅ Dispositivo recuperado",
-                body=f"{name} vuelve a estar en línea",
-            )
+            send_alert("recovery", monitor, {
+                "duration": "unknown",
+                "state": "up",
+            })
         else:
-            reason = f" — {error}" if error else ""
-            send_push(
-                title="🔴 Dispositivo caído",
-                body=f"{name} no responde{reason}",
-            )
+            send_alert("down", monitor, {
+                "message": error or "No response",
+                "state": "down",
+            })
     except Exception as e:
-        logger.error("No se pudo enviar notificación: %s", e)
+        logger.error("No se pudo enviar alerta: %s", e)
 
 
 def _loop():
@@ -214,7 +257,8 @@ def _loop():
             run_monitor_cycle()
             # Daily cleanup
             if time.time() - _last_cleanup_ts > 86400:
-                cleanup_old_history(days=30)
+                cleanup_old_history()
+                cleanup_detailed_history()
                 _last_cleanup_ts = time.time()
         except Exception as e:
             logger.error("Error en el ciclo de monitoreo: %s", e)
