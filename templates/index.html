@@ -542,38 +542,39 @@ function renderDevices(devices){
     // System metrics (CPU/RAM/Temp/Disk bars) for type 'system'
     let systemMetricsHtml = '';
     if(d.type==='system' && d.cpu_pct!=null){
-      const tempColor = d.temp_c==null?'var(--green)':d.temp_c<70?'var(--green)':d.temp_c<80?'var(--amber)':'var(--red)';
+      const tempColor = d.temp_c==null?'var(--green)':d.temp_c<70?'var(--green)':d.temp_c<90?'var(--amber)':'var(--red)';
       const cpuColor  = d.cpu_pct==null?'var(--green)':d.cpu_pct<70?'var(--green)':d.cpu_pct<90?'var(--amber)':'var(--red)';
       const ramColor  = d.ram_pct==null?'var(--green)':d.ram_pct<70?'var(--green)':d.ram_pct<90?'var(--amber)':'var(--red)';
-      const diskColor = d.disk_pct==null?'var(--green)':d.disk_pct<80?'var(--green)':d.disk_pct<95?'var(--amber)':'var(--red)';
+      const diskColor = d.disk_pct==null?'var(--green)':d.disk_pct<70?'var(--green)':d.disk_pct<90?'var(--amber)':'var(--red)';
       systemMetricsHtml=`
-        <div class="sys-row"><span class="sys-label">CPU</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.cpu_pct??0}%;background:${cpuColor}"></div></div><span class="sys-val" style="color:${cpuColor}">${d.cpu_pct!=null?d.cpu_pct+'%':'—'}</span></div>
-        <div class="sys-row"><span class="sys-label">RAM</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.ram_pct??0}%;background:${ramColor}"></div></div><span class="sys-val" style="color:${ramColor}">${d.ram_pct!=null?d.ram_pct+'%':'—'}</span></div>
-        <div class="sys-row"><span class="sys-label">Temp</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.temp_c!=null?Math.min(d.temp_c,100):0}%;background:${tempColor}"></div></div><span class="sys-val" style="color:${tempColor}">${d.temp_c!=null?d.temp_c+'°C':'—'}</span></div>
-        <div class="sys-row"><span class="sys-label">Disco</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.disk_pct??0}%;background:${diskColor}"></div></div><span class="sys-val" style="color:${diskColor}">${d.disk_pct!=null?d.disk_pct+'%':'—'}</span></div>
-        <div class="since-row" style="margin-top:6px">${d.ram_used_mb!=null?'RAM '+d.ram_used_mb+'/'+d.ram_total_mb+' MB · ':''}${d.disk_used_gb!=null?'Disco '+d.disk_used_gb+'/'+d.disk_total_gb+' GB':''}</div>
+        <div class="sys-row"><span class="sys-label">CPU</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.cpu_pct??0}%;background:${cpuColor}"></div></div><span class="sys-val">${d.cpu_pct!=null?d.cpu_pct+'%':'—'}</span></div>
+        <div class="sys-row"><span class="sys-label">RAM</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.ram_pct??0}%;background:${ramColor}"></div></div><span class="sys-val">${d.ram_pct!=null?d.ram_pct+'%':'—'}</span></div>
+        <div class="sys-row"><span class="sys-label">TEMP</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.temp_c!=null?Math.min(d.temp_c,100):0}%;background:${tempColor}"></div></div><span class="sys-val">${d.temp_c!=null?d.temp_c+'°C':'—'}</span></div>
+        <div class="sys-row"><span class="sys-label">DISK</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.disk_pct??0}%;background:${diskColor}"></div></div><span class="sys-val">${d.disk_pct!=null?d.disk_pct+'%':'—'}</span></div>
+        <div class="since-row" style="margin-top:6px;">Uptime: ${d.uptime||'—'}</div>
       `;
     }
 
     // Docker container info for type 'docker'
     let dockerMetricsHtml = '';
-    if(d.type==='docker' && d.docker_info){
-      const di=d.docker_info;
-      const up=di.running;
-      dockerMetricsHtml=`<div class="docker-containers">
-        <div class="docker-container-item">
+    if(d.type==='docker' && d.containers && d.containers.length){
+      const items = d.containers.map(c => {
+        const isRunning = c.state === 'running';
+        return `<div class="docker-container-item">
           <div class="docker-container-header">
-            <div class="led ${up?'on':'off'}" style="width:8px;height:8px;min-width:8px"></div>
-            <span class="docker-container-name">${di.container_name||''}</span>
-            <span class="docker-container-pill ${up?'up':'down'}">${up?'UP':'DOWN'}</span>
+            <div class="led ${isRunning?'on':'off'}" style="width:8px;height:8px;min-width:8px"></div>
+            <span style="font-size:12px;font-weight:500;">${c.name}</span>
+            <span style="margin-left:auto;font-size:11px;color:var(--text-dim)">${c.status||c.state}</span>
           </div>
-          ${up?`<div class="docker-container-body open">
-            <div class="sys-row"><span class="sys-label" style="width:70px">CPU</span><span class="sys-val" style="width:auto;color:var(--text)">${di.cpu||'n/a'}</span></div>
-            <div class="sys-row"><span class="sys-label" style="width:70px">RAM</span><span class="sys-val" style="width:auto;color:var(--text)">${di.mem||'n/a'}</span></div>
-            <div class="sys-row"><span class="sys-label" style="width:70px">Red</span><span class="sys-val" style="width:auto;color:var(--text-dim)">${di.net||'n/a'}</span></div>
+          ${isRunning?`<div class="docker-container-body open">
+            <div class="sys-row"><span class="sys-label" style="width:70px">CPU</span><span class="sys-val" style="width:auto;color:var(--text)">${c.cpu||'n/a'}</span></div>
+            <div class="sys-row"><span class="sys-label" style="width:70px">RAM</span><span class="sys-val" style="width:auto;color:var(--text)">${c.mem||'n/a'}</span></div>
+            <div class="sys-row"><span class="sys-label" style="width:70px">Red</span><span class="sys-val" style="width:auto;color:var(--text-dim)">${c.net||'n/a'}</span></div>
           </div>`:''}
-        </div>
-      </div>`;
+        </div>`;
+      }).join('');
+      dockerMetricsHtml = `<div class="docker-containers">${items}</div>`;
+    }
     }
 
     // Fila PROTECCIÓN para ha_switch (dentro del body desplegable)

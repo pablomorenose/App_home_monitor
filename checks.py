@@ -435,74 +435,133 @@ def check_tls(url: str, timeout: int = 8, tls_warn_days: int = 14) -> dict:
 
 
 # ───────────────────────────────────────────────────────────────────
-# Docker Container Check (new)
+# Docker helpers (reusable)
 # ───────────────────────────────────────────────────────────────────
 
-def check_docker(container_name: str, timeout: int = 5) -> dict:
-    """Check Docker container status via /var/run/docker.sock."""
+def _docker_socket_get(path: str, timeout: int = 5):
+    """Make an HTTP GET request to the Docker socket. Returns parsed JSON."""
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(timeout)
+    s.connect("/var/run/docker.sock")
+    req = f"GET {path} HTTP/1.0\r\nHost: localhost\r\n\r\n"
+    s.sendall(req.encode())
+    resp = b""
+    while True:
+        chunk = s.recv(65536)
+        if not chunk:
+            break
+        resp += chunk
+    s.close()
+    body = resp.split(b"\r\n\r\n", 1)[1]
+    return json.loads(body)
+
+
+def _fmt_bytes(b):
+    """Format bytes to human readable string."""
+    if b >= 1048576:
+        return f"{round(b/1048576,1)}MB"
+    return f"{round(b/1024,1)}kB"
+
+
+def get_all_docker_containers(timeout: int = 5) -> dict:
+    """
+    Read ALL containers from Docker socket with stats.
+    Returns a dict with:
+      - state: 'up' | 'degraded' | 'down'
+      - message: str
+      - containers: list of container info dicts
+    """
     try:
-        start = time.monotonic()
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
-        sock.connect("/var/run/docker.sock")
+        all_containers = _docker_socket_get("/containers/json?all=true", timeout=timeout)
+        containers = []
+        running_count = 0
+        total_count = len(all_containers)
 
-        # Query container by name
-        req = (
-            f"GET /containers/{container_name}/json HTTP/1.0\r\n"
-            f"Host: localhost\r\n\r\n"
-        )
-        sock.sendall(req.encode())
+        for c in all_containers:
+            cid = c["Id"]
+            name = c["Names"][0].lstrip("/") if c.get("Names") else cid[:12]
+            status = c.get("State", "unknown")
+            status_text = c.get("Status", "")
 
-        resp = b""
-        while True:
-            chunk = sock.recv(65536)
-            if not chunk:
-                break
-            resp += chunk
-        sock.close()
-        ms = round((time.monotonic() - start) * 1000)
+            container_info = {
+                "name": name,
+                "state": status,
+                "status": status_text,
+                "cpu": "—",
+                "mem": "—",
+                "net": "—",
+            }
 
-        # Parse HTTP response
-        parts = resp.split(b"\r\n\r\n", 1)
-        if len(parts) < 2:
-            return _make_result("down", "Respuesta inválida del socket Docker",
-                                latency_ms=ms)
+            if status == "running":
+                running_count += 1
+                # Get stats for running containers
+                try:
+                    stats = _docker_socket_get(f"/containers/{cid}/stats?stream=false", timeout=timeout)
+                    # CPU
+                    cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - stats["precpu_stats"]["cpu_usage"]["total_usage"]
+                    sys_delta = stats["cpu_stats"].get("system_cpu_usage", 0) - stats["precpu_stats"].get("system_cpu_usage", 0)
+                    if sys_delta > 0:
+                        cpu_pct = min(round((cpu_delta / sys_delta) * 100, 1), 100.0)
+                    else:
+                        cpu_pct = 0.0
+                    container_info["cpu"] = f"{cpu_pct}%"
 
-        status_line = parts[0].split(b"\r\n")[0].decode()
-        if "404" in status_line:
-            return _make_result("down", f"Container '{container_name}' no encontrado",
-                                latency_ms=ms)
-        if "200" not in status_line:
-            return _make_result("down", f"Docker respondió: {status_line}",
-                                latency_ms=ms)
+                    # Memory
+                    mem_usage = stats["memory_stats"].get("usage", 0) - stats["memory_stats"].get("stats", {}).get("cache", 0)
+                    container_info["mem"] = f"{round(mem_usage / 1048576, 1)}MB"
 
-        body = json.loads(parts[1])
-        state = body.get("State", {})
-        container_status = state.get("Status", "unknown")
-        running = state.get("Running", False)
-        health = state.get("Health", {}).get("Status", "")
+                    # Network
+                    net_rx = sum(v["rx_bytes"] for v in stats.get("networks", {}).values())
+                    net_tx = sum(v["tx_bytes"] for v in stats.get("networks", {}).values())
+                    container_info["net"] = f"↓{_fmt_bytes(net_rx)} ↑{_fmt_bytes(net_tx)}"
+                except Exception:
+                    container_info["cpu"] = "n/a"
+                    container_info["mem"] = "n/a"
+                    container_info["net"] = "n/a"
 
-        if not running:
-            return _make_result("down", f"Container parado (status={container_status})",
-                                latency_ms=ms, container_status=container_status)
+            containers.append(container_info)
 
-        if health == "unhealthy":
-            return _make_result("degraded", "Container running pero unhealthy",
-                                latency_ms=ms, container_status=container_status,
-                                health_status=health)
+        # Sort: running first, then alphabetical
+        containers.sort(key=lambda x: (0 if x["state"] == "running" else 1, x["name"].lower()))
 
-        return _make_result("up", f"Container running ({health or 'no healthcheck'})",
-                            latency_ms=ms, container_status=container_status,
-                            health_status=health)
+        # Determine overall state
+        if total_count == 0:
+            return {"state": "up", "message": "Docker OK (sin contenedores)", "containers": []}
+        elif running_count == total_count:
+            return {"state": "up", "message": f"Todos los contenedores running ({running_count})", "containers": containers}
+        elif running_count == 0:
+            return {"state": "down", "message": "Todos los contenedores parados", "containers": containers}
+        else:
+            stopped = total_count - running_count
+            return {"state": "degraded", "message": f"{stopped} contenedor(es) parado(s)", "containers": containers}
 
     except FileNotFoundError:
-        return _make_result("down", "Docker socket no encontrado (/var/run/docker.sock)")
+        return {"state": "down", "message": "Docker socket no encontrado (/var/run/docker.sock)", "containers": []}
     except PermissionError:
-        return _make_result("down", "Sin permisos para acceder al socket Docker")
+        return {"state": "down", "message": "Sin permisos para acceder al socket Docker", "containers": []}
     except socket.timeout:
-        return _make_result("down", "Docker socket timeout")
+        return {"state": "down", "message": "Docker socket timeout", "containers": []}
     except Exception as e:
-        return _make_result("down", f"Error Docker: {type(e).__name__}: {e}")
+        return {"state": "down", "message": f"Error Docker: {type(e).__name__}: {e}", "containers": []}
+
+
+# ───────────────────────────────────────────────────────────────────
+# Docker Container Check (all containers)
+# ───────────────────────────────────────────────────────────────────
+
+def check_docker(monitor: dict) -> dict:
+    """Check ALL Docker containers via /var/run/docker.sock."""
+    timeout = int(monitor.get("timeout", 5)) if isinstance(monitor, dict) else 5
+    start = time.monotonic()
+    result = get_all_docker_containers(timeout=timeout)
+    ms = round((time.monotonic() - start) * 1000)
+
+    return _make_result(
+        result["state"],
+        result["message"],
+        latency_ms=ms,
+        containers=result["containers"],
+    )
 
 
 # ───────────────────────────────────────────────────────────────────
@@ -721,10 +780,7 @@ def check_monitor(monitor: dict) -> dict:
         )
 
     if mtype == "docker":
-        return check_docker(
-            container_name=monitor.get("container_name", monitor.get("id", "")),
-            timeout=timeout,
-        )
+        return check_docker(monitor)
 
     if mtype == "system":
         return check_system(timeout=timeout)
