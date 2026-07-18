@@ -10,10 +10,13 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 FROM python:3.12-slim
 
+ARG DOCKER_GID=991
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 iputils-ping curl \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd -r -s /bin/false appuser
+    && groupadd -g ${DOCKER_GID} docker \
+    && useradd -r -s /bin/false -G docker appuser
 
 COPY --from=builder /install /usr/local
 
