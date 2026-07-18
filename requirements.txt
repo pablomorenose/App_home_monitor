@@ -1,5 +1,5 @@
-flask>=3.0
-requests>=2.31
-psycopg2-binary>=2.9
-python-dotenv>=1.0
-pywebpush>=2.0
+flask==3.1.1
+requests==2.32.3
+psycopg2-binary==2.9.10
+python-dotenv==1.1.0
+pywebpush==2.0.4
