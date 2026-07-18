@@ -1,103 +1,108 @@
-# Notas para la próxima IA
+# Home Monitor v2.0.0 — Estado actual y pendientes
 
-## Infraestructura actual — YA NO usamos fly.io
+## ✅ Implementado en v2.0.0
 
-La app se ha migrado completamente a una Raspberry Pi 4 local.
-fly.io queda abandonado, no hay que tocarlo ni desplegarlo ahí.
+### Phase 1 — Seguridad
+- [x] Protección CSRF en todas las mutaciones
+- [x] Security headers (CSP, HSTS, X-Frame-Options, etc.)
+- [x] Sesiones seguras (HttpOnly, SameSite, Secure)
+- [x] Rate limiting en login
+- [x] Docker hardening (read-only, no-new-privileges, cap-drop ALL)
+- [x] Validación de configuración al arranque
+- [x] Usuario no-root en contenedor
 
-### Acceso a la app
-- Red local:     http://192.168.1.119:8088
-- Internet:      https://raspberrypi.tail08d292.ts.net  (Tailscale Funnel, gratuito, HTTPS automático)
+### Phase 2 — Modelo de monitores extendido
+- [x] Schema con retries, intervals, dependencies, tags
+- [x] Check types: HTTP, Ping, Port, HA Entity, HA Switch, DNS, TLS, Docker, Heartbeat
+- [x] Validación de datos de monitores
+- [x] Campos extendidos: http_method, http_headers, http_body, verify_keyword
+- [x] TLS warning days, expected status codes, follow redirects
+- [x] Latency threshold para estado degraded
 
-### La Raspberry Pi
-- Hostname:      raspberrypi
-- Usuario:       admin
-- OS:            Debian Bookworm arm64
-- IP local:      192.168.1.119
-- Tailscale IP:  100.112.43.5
+### Phase 3 — State Machine & Alertas
+- [x] Estados: pending → up / down / degraded / maintenance
+- [x] Transiciones con retries (consecutive_failures/successes)
+- [x] Recovery threshold
+- [x] Dependency-aware checks
+- [x] Web Push notifications (VAPID)
+- [x] Webhook alerts
+- [x] Rate limiting de alertas
+- [x] Modo mantenimiento por horas
 
-### Docker
-- La app corre en un contenedor llamado "home-monitor"
-- Puerto: 8088
-- El contenedor tiene acceso al socket de Docker para monitorización:
-    -v /var/run/docker.sock:/var/run/docker.sock
-- Tiene --restart unless-stopped (arranca solo al reiniciar la Pi)
-- Las variables de entorno están en /home/admin/Home_Monitor/.env (NO está en GitHub)
+### Phase 4 — Historial y estadísticas
+- [x] State + message en historial
+- [x] Uptime % (24h, 7d)
+- [x] Average latency
+- [x] Stats API por monitor
+- [x] Time-series history API
+- [x] Global summary stats
+- [x] Agregación automática (detalle → horario tras 7 días)
+- [x] Retención configurable (HISTORY_RETENTION_DAYS)
 
-### Auto-update
-- Hay un cron cada 5 minutos que hace git pull y reconstruye la imagen si hay cambios
-- Script: /home/admin/Home_Monitor/auto-update.sh
-- Log: /home/admin/home-monitor-update.log
-- Por tanto: cuando hagas git push, en menos de 5 minutos la Pi se actualiza sola
+### Phase 5 — UX Improvements (backend)
+- [x] Public status page API (`GET /api/status-page`)
+- [x] Bulk operations (pause/resume/delete)
+- [x] Monitor groups/tags API (`GET /api/groups`)
+- [x] Export/Import de monitores (`GET /api/export`, `POST /api/import`)
+- [x] STATUS_PAGE_ENABLED config var
 
-### Variables de entorno necesarias (.env)
-- DATABASE_URL       — Supabase PostgreSQL (pooler)
-- DB_HOST            — aws-1-eu-central-1.pooler.supabase.com
-- DB_PORT            — 6543
-- DB_NAME            — postgres
-- DB_USER            — postgres.fjyckjfrbpsneyhkrvsj
-- DB_PASSWORD        — (en el .env de la Pi)
-- HOME_ASSISTANT_URL — https://antediluvian.tplinkdns.com
-- HOME_ASSISTANT_TOKEN — (token largo de Home Assistant)
-- CHECK_INTERVAL_SECONDS — 15
-- VAPID_PRIVATE_KEY  — (generada en la Pi)
-- VAPID_PUBLIC_KEY   — (generada en la Pi)
-- VAPID_CLAIMS_EMAIL — admin@home-monitor.local
-
----
-
-## Lo que ya está implementado en esta versión (rama main)
-
-### Tarjeta "Raspberry Pi"
-- Muestra CPU%, RAM%, temperatura, disco y uptime en tiempo real
-- Se refresca cada 15 segundos
-- Mismo aspecto visual que el resto de tarjetas: LED verde, se puede colapsar y arrastrar
-- Los datos vienen del endpoint GET /api/pi-stats (en app.py)
-
-### Tarjeta "Docker / Home Monitor"
-- Muestra estado del contenedor (running/stopped), CPU%, RAM y tráfico de red
-- LED rojo si el contenedor está caído
-- Mismo aspecto visual que el resto de tarjetas: LED, colapsar, arrastrar
-- Los datos también vienen de /api/pi-stats, sección "docker"
-- La RAM del Docker muestra "n/a" hasta que se reinicie la Pi (cgroups de memoria
-  habilitados en /boot/firmware/cmdline.txt, necesita reboot para aplicar)
+### Phase 6 — Operabilidad
+- [x] Health endpoint (`GET /health`) — DB check, uptime, version
+- [x] APP_VERSION = "2.0.0"
+- [x] README.md completo con documentación
+- [x] Referencia de variables de entorno
+- [x] Referencia de API endpoints
 
 ---
 
-## Lo que hay que hacer cuando actualices al diseño nuevo
+## 🔮 Pendiente para futuras versiones
 
-La versión con diseño nuevo (aspecto cristal, iconos nuevos) NO está en GitHub todavía.
-El usuario la subirá desde su otro ordenador.
+### v2.1 — Mejoras de alertas
+- [ ] Telegram bot notifications (config: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
+- [ ] Email alerts (SMTP)
+- [ ] Alert escalation (notify different channels after X minutes)
+- [ ] Alert acknowledgement API
+- [ ] Notification preferences per monitor
 
-Cuando llegue ese push, hay que:
-1. Portar el endpoint /api/pi-stats de app.py (está completo en rama main)
-2. Añadir las dos tarjetas en el nuevo index.html con el nuevo diseño visual
-   manteniendo: LED, colapsar, arrastrar, barras de progreso
-3. El JS necesario está en loadPiStats() y toggleSysCard() del index.html actual
-4. Asegurarse de que el contenedor sigue arrancando con:
-   -v /var/run/docker.sock:/var/run/docker.sock
+### v2.2 — Dashboard frontend
+- [ ] Status page frontend (HTML/JS usando /api/status-page)
+- [ ] Grafana-style latency charts
+- [ ] Monitor group filtering in UI
+- [ ] Bulk actions UI (checkboxes + buttons)
+- [ ] Export/Import UI buttons
+
+### v2.3 — Integrations
+- [ ] Slack notifications
+- [ ] Discord webhook
+- [ ] PagerDuty integration
+- [ ] Prometheus metrics endpoint (`/metrics`)
+- [ ] Grafana datasource API
+
+### v2.4 — Multi-user
+- [ ] User accounts (not just single password)
+- [ ] API keys for automation
+- [ ] Role-based access (admin/viewer)
+- [ ] Audit log
+
+### v2.5 — Advanced monitoring
+- [ ] Multi-step checks (HTTP chain)
+- [ ] Content change detection
+- [ ] Performance budget tracking
+- [ ] Geographic probes (check from multiple locations)
+- [ ] Scheduled maintenance windows (calendar)
+
+### Infraestructura
+- [ ] Migrar a multi-container con Redis para colas
+- [ ] Backup automático de BD
+- [ ] Métricas internas de la app (response times, queue depth)
+- [ ] Auto-scaling de workers según carga
 
 ---
 
-## Estructura del endpoint /api/pi-stats
+## Notas de infraestructura
 
-Devuelve:
-{
-  "cpu_pct": 15.7,
-  "ram_total_mb": 3795,
-  "ram_used_mb": 2150,
-  "ram_avail_mb": 1645,
-  "ram_pct": 56.8,
-  "temp_c": 51.1,
-  "disk_total_gb": 117.5,
-  "disk_used_gb": 27.8,
-  "disk_free_gb": 83.7,
-  "disk_pct": 23.7,
-  "uptime": "6d 8h 18min",
-  "docker": {
-    "status": "running",
-    "cpu": "0.5%",
-    "mem": "25.3MB",
-    "net": "↓243.6kB ↑129.8kB"
-  }
-}
+- La app corre en Raspberry Pi 4 con Docker
+- BD: PostgreSQL en Supabase (free tier)
+- Acceso: Tailscale Funnel (HTTPS automático, gratis)
+- Auto-update: cron cada 5 min hace git pull + rebuild
+- Docker socket montado para métricas de contenedores

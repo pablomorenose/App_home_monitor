@@ -1,202 +1,221 @@
-# Home Monitor
+# Home Monitor v2.0.0
 
-Panel de estado para Home Assistant, cámaras IP y NAS Synology.
-Comprueba periódicamente cada dispositivo y muestra un LED verde/rojo, junto
-con el tiempo que lleva en ese estado ("caído desde hace 2h 15min").
+A comprehensive monitoring tool for homelab infrastructure. Monitors HTTP services, network devices, Home Assistant entities, Docker containers, DNS, TLS certificates, and more — with a state machine, alerting, and a public status page API.
 
-Diseñado para correr en una Raspberry Pi 4, dentro de tu red local.
+Designed to run on a Raspberry Pi or any Docker host in your local network.
 
-## 1. Instalación
+## Features
 
-Copia esta carpeta a tu Raspberry Pi (por ejemplo a `/home/pi/home-monitor`)
-y desde dentro de la carpeta:
+### Check Types
+- **HTTP** — URL reachability with status code validation, keyword verification, redirect following
+- **Ping** — ICMP ping with latency measurement
+- **Port** — TCP port open check
+- **Home Assistant Entity** — Monitor any HA entity state (cameras, sensors, etc.)
+- **Home Assistant Switch** — Monitor and toggle HA switches
+- **DNS** — DNS resolution check
+- **TLS** — Certificate expiration monitoring with configurable warning days
+- **Docker** — Container status via Docker socket
+- **Heartbeat** — Passive monitoring (external services ping an endpoint)
 
+### State Machine
+Each monitor transitions through: `pending` → `up` / `down` / `degraded` / `maintenance`
+- Configurable retries before marking down
+- Recovery threshold before marking up again
+- Latency threshold for degraded state
+- Dependency-aware (can depend on other monitors)
+
+### Alerting
+- **Web Push** — Browser push notifications via VAPID/Web Push
+- **Telegram** — Bot notifications (planned)
+- **Webhook** — POST to any URL on state change
+- Rate limiting to prevent alert storms
+
+### History & Stats
+- State + message recorded in history
+- Uptime percentage calculation (24h, 7d)
+- Average latency tracking
+- Time-series data for charting
+- Automatic history aggregation (detailed → hourly after 7 days)
+- Configurable retention period
+
+### UX & Operations
+- Public status page API (no auth required)
+- Bulk operations (pause/resume/delete multiple monitors)
+- Monitor groups/tags
+- Export/Import for backup and migration
+- Health check endpoint for orchestrators
+- Docker metrics dashboard (CPU, RAM, network per container)
+
+### Security
+- CSRF protection on all mutations
+- Secure session cookies (HttpOnly, SameSite, Secure in production)
+- Security headers (CSP, HSTS, X-Frame-Options, etc.)
+- Rate-limited login
+- Docker hardening (read-only FS, no-new-privileges, cap-drop ALL)
+- Non-root container user
+
+## Quick Start with Docker Compose
+
+1. Clone the repository:
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+git clone https://github.com/your-user/App_home_monitor.git
+cd App_home_monitor
 ```
 
-## 2. Configuración
-
-**Importante sobre esta instalación:** la Raspberry está en la oficina, y
-Home Assistant, el NAS y las cámaras están en tu casa, en una red distinta.
-Por eso `config.py` usa URLs públicas (DDNS, QuickConnect) en vez de IPs
-locales — la Raspberry necesita salir a internet para llegar a casa, igual
-que harías tú desde el móvil.
-
-Abre `config.py` y rellena:
-
-### Home Assistant
-
-```python
-HOME_ASSISTANT_URL = "https://tu-ddns-de-casa.duckdns.org"
-HOME_ASSISTANT_TOKEN = "PEGA_AQUI_TU_TOKEN_LARGO"
-```
-
-- `HOME_ASSISTANT_URL`: la URL pública por la que ya accedes a HA desde
-  fuera de casa (el DDNS + puerto que tienes abierto en el router de casa).
-- `HOME_ASSISTANT_TOKEN`: un token de acceso de larga duración. Se genera
-  así:
-  1. Entra en Home Assistant con tu navegador
-  2. Click en tu perfil (abajo a la izquierda, tu nombre/avatar)
-  3. Pestaña **Seguridad** → sección **Tokens de acceso de larga duración**
-  4. **Crear token**, ponle un nombre (ej. "monitor-oficina") y copia el
-     token completo — solo se muestra una vez
-
-Este mismo token es el que se usa también para comprobar las cámaras
-(siguiente apartado), así que solo hace falta generarlo una vez.
-
-### NAS Synology
-
-```python
-"url": "https://tu-id.quickconnect.to",
-```
-
-Pon aquí tu URL real de QuickConnect. Ten en cuenta que QuickConnect pasa
-por los servidores de Synology como intermediario, así que esta
-comprobación depende tanto de tu NAS como de que el servicio de
-QuickConnect esté operativo — es la mejor aproximación posible sin abrir tú
-mismo un puerto en el router de casa hacia el NAS (lo cual no se
-recomienda, ya que la interfaz DSM es un objetivo común de ataques).
-
-### Cámaras
-
-Como tus cámaras están conectadas directamente a Home Assistant (no tienen
-IP propia accesible desde fuera), se comprueban consultando su estado
-dentro de Home Assistant, usando el mismo token de arriba:
-
-```python
-{
-    "id": "camara_entrada",
-    "name": "Cámara Entrada",
-    "type": "ha_entity",
-    "entity_id": "camera.entrada",   # <-- el entity_id real en tu HA
-    "timeout": 8,
-},
-```
-
-Para encontrar el `entity_id` exacto de cada cámara en tu Home Assistant:
-
-- Ajustes → Dispositivos y servicios → Entidades → busca "cámara" o el
-  nombre que le hayas puesto, o
-- Herramientas de desarrollador → Estados → filtra por `camera.`
-
-Copia el texto exacto que empieza por `camera.` (por ejemplo
-`camera.entrada_principal`) y pégalo en `entity_id`.
-
-Una cámara se considera "caída" cuando Home Assistant reporta su estado
-como `unavailable` o `unknown` — es decir, cuando HA ha perdido la
-conexión con ella, que es la misma información que verías tú en el panel
-de HA.
-
-## 3. Probarlo manualmente
-
+2. Create your `.env` file:
 ```bash
-source venv/bin/activate
-python3 app.py
+cp .env.example .env
+# Edit .env with your values (see Environment Variables below)
 ```
 
-Abre en el navegador (desde cualquier dispositivo de tu red):
-
-```
-http://IP_DE_TU_RASPBERRY:8088
-```
-
-Si todo va bien, deberías ver los LEDs en verde para los dispositivos que
-están encendidos y accesibles en tu red.
-
-## 4. Arranque automático al encender la Raspberry Pi (systemd)
-
-Para que el monitor se inicie solo cada vez que arranque la Raspberry y se
-reinicie si falla, crea un servicio de systemd.
-
-Crea el archivo `/etc/systemd/system/home-monitor.service` con este
-contenido (ajusta las rutas y el usuario si no usas `pi`):
-
-```ini
-[Unit]
-Description=Home Monitor Dashboard
-After=network.target
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/home-monitor
-ExecStart=/home/pi/home-monitor/venv/bin/python3 app.py
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Luego activa y arranca el servicio:
-
+3. Generate a secret key:
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable home-monitor
-sudo systemctl start home-monitor
+python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-Comandos útiles:
-
+4. Start the app:
 ```bash
-sudo systemctl status home-monitor   # ver si está corriendo
-sudo systemctl restart home-monitor  # reiniciarlo
-journalctl -u home-monitor -f        # ver logs en vivo
+docker compose up -d
 ```
 
-## 5. Acceder desde fuera de casa/oficina (DDNS + HTTPS + contraseña)
+5. Access at `http://localhost:8088`
 
-Si quieres ver el panel desde el móvil estando fuera de la red donde está
-la Raspberry (por ejemplo, usando tu DDNS `antediluvian.tplinkdns.com`,
-igual que ya haces con Home Assistant), sigue la guía completa en
-[`deploy/README_DEPLOY.md`](deploy/README_DEPLOY.md).
+## Environment Variables
 
-Esa guía monta Nginx delante de Flask para añadir:
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `APP_ENV` | No | `production` | `production` or `development` |
+| `SECRET_KEY` | **Yes** | — | Session signing key (min 16 chars) |
+| `ACCESS_PASSWORD` | **Yes** | — | Login password |
+| `DB_HOST` | **Yes** | — | PostgreSQL host |
+| `DB_PORT` | No | `5432` | PostgreSQL port |
+| `DB_NAME` | No | `postgres` | Database name |
+| `DB_USER` | No | `postgres` | Database user |
+| `DB_PASSWORD` | **Yes** | — | Database password |
+| `CHECK_INTERVAL_SECONDS` | No | `15` | Default check interval (min 5) |
+| `MAX_CHECK_WORKERS` | No | `20` | Max concurrent check threads |
+| `HOME_ASSISTANT_URL` | No | — | HA base URL (enables HA monitors) |
+| `HOME_ASSISTANT_TOKEN` | No | — | HA long-lived access token |
+| `VAPID_PRIVATE_KEY` | No | — | Web Push private key |
+| `VAPID_PUBLIC_KEY` | No | — | Web Push public key |
+| `VAPID_CLAIMS_EMAIL` | No | — | Web Push contact email |
+| `DOCKER_METRICS_ENABLED` | No | `true` | Enable Docker stats collection |
+| `STATUS_PAGE_ENABLED` | No | `true` | Enable public status page API |
+| `LOG_LEVEL` | No | `INFO` | Logging level |
+| `TZ` | No | `Europe/Madrid` | Timezone |
+| `ALLOW_INSECURE_NO_AUTH` | No | `false` | Dev only: allow no password |
+| `HISTORY_RETENTION_DAYS` | No | `30` | Days to retain history data |
 
-- **HTTPS real** con certificado de Let's Encrypt (gratis, se renueva solo)
-- **Usuario y contraseña**, ya que el dashboard no trae login de por sí
+## API Endpoints
 
-Importante: `app.py` está configurado para escuchar solo en
-`127.0.0.1` (no en `0.0.0.0`), precisamente para que **no se pueda acceder
-directamente a Flask desde fuera de la Raspberry** — todo el tráfico
-externo tiene que pasar por Nginx, con su HTTPS y su contraseña. Si en algún
-momento quieres volver a probar el dashboard en tu red local sin pasar por
-Nginx, puedes cambiar temporalmente esa línea a `0.0.0.0`, pero no lo dejes
-así si vas a exponer el puerto a internet.
+### Public (no auth)
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Health check (status, DB, uptime, version) |
+| `GET` | `/api/status-page` | Public status page data |
+| `POST` | `/api/heartbeat/<id>` | Receive heartbeat ping |
 
-### Alternativa sin tocar el router: Tailscale
+### Authenticated
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/status` | All device statuses |
+| `GET` | `/api/monitors` | List all monitors with state |
+| `GET` | `/api/monitors/<id>` | Single monitor detail |
+| `POST` | `/api/monitors` | Create monitor |
+| `PUT` | `/api/monitors/<id>` | Update monitor |
+| `DELETE` | `/api/monitors/<id>` | Delete monitor |
+| `GET` | `/api/monitors/<id>/stats` | Uptime %, latency, incidents |
+| `GET` | `/api/monitors/<id>/history` | Time-series history |
+| `GET` | `/api/stats/summary` | Global summary stats |
+| `GET` | `/api/groups` | Monitors grouped by tags |
+| `GET` | `/api/export` | Export all monitors as JSON |
+| `POST` | `/api/import` | Import monitors from JSON |
+| `POST` | `/api/monitors/bulk-pause` | Bulk maintenance mode |
+| `POST` | `/api/monitors/bulk-resume` | Bulk end maintenance |
+| `POST` | `/api/monitors/bulk-delete` | Bulk delete monitors |
+| `GET` | `/api/uptime/<id>` | 24h uptime segments |
+| `GET` | `/api/latency/<id>` | Latency sparkline data |
+| `GET` | `/api/incidents` | Global incident history |
+| `GET` | `/api/devices` | List devices (legacy) |
+| `POST` | `/api/devices` | Add device (legacy) |
+| `GET` | `/api/pi-stats` | Raspberry Pi system stats |
+| `POST` | `/api/force-check` | Trigger immediate check |
 
-Si más adelante prefieres no depender de abrir puertos en el router de la
-oficina, [Tailscale](https://tailscale.com) es una alternativa sin
-necesidad de DDNS ni Nginx ni certificados — crea una red privada entre tus
-dispositivos. Es más sencilla de mantener, aunque significa instalar una
-app adicional en el móvil.
+### Auth endpoints
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/login` | Login with password |
+| `GET` | `/logout` | Clear session |
+| `GET` | `/api/csrf-token` | Get CSRF token |
 
-## 6. Estructura del proyecto
+## Architecture Overview
 
 ```
-config.py          → IPs y dispositivos a monitorizar (lo único que sueles tocar)
-checks.py           → Lógica de comprobación (http / ping / port)
-db.py               → Guarda el histórico en SQLite (monitor.db, se crea solo)
-monitor_worker.py   → Bucle en background que comprueba todo cada X segundos
-app.py              → Servidor Flask: sirve el dashboard y la API /api/status
-templates/index.html → El dashboard visual (LEDs, tiempos, etc.)
+┌─────────────────────────────────────────────────────┐
+│                   Docker Container                    │
+│                                                      │
+│  ┌──────────┐    ┌───────────────┐    ┌──────────┐ │
+│  │  Flask   │    │ Monitor Worker│    │  Alerts  │ │
+│  │  (app.py)│    │ (background)  │    │  Engine  │ │
+│  └────┬─────┘    └───────┬───────┘    └────┬─────┘ │
+│       │                  │                  │       │
+│       └──────────┬───────┘──────────────────┘       │
+│                  │                                   │
+│           ┌──────┴──────┐                           │
+│           │   db.py     │                           │
+│           │ (PostgreSQL)│                           │
+│           └──────┬──────┘                           │
+└──────────────────┼───────────────────────────────────┘
+                   │
+            ┌──────┴──────┐
+            │  PostgreSQL  │
+            │  (Supabase)  │
+            └─────────────┘
 ```
 
-## 7. Personalización rápida
+- **app.py** — Flask web server, REST API, authentication, security headers
+- **monitor_worker.py** — Background thread running checks at configured intervals
+- **checks.py** — Check implementations (HTTP, Ping, Port, DNS, TLS, HA, Docker, Heartbeat)
+- **state_machine.py** — State transitions with retries and recovery thresholds
+- **alerts.py** — Alert dispatch (Web Push, Telegram, Webhook) with rate limiting
+- **db.py** — PostgreSQL data layer (statuses, history, config)
+- **config.py** — Environment-based configuration with validation
+- **validators.py** — Input validation for monitor data
+- **csrf.py** — CSRF token generation and verification
 
-- **Frecuencia de comprobación**: cambia `CHECK_INTERVAL_SECONDS` en `config.py`.
-- **Frecuencia de refresco del navegador**: cambia `REFRESH_MS` en
-  `templates/index.html`.
-- **Tipos de comprobación disponibles**:
-  - `http`: para servicios con interfaz web accesible por URL (Home
-    Assistant, QuickConnect del NAS)
-  - `ha_entity`: consulta el estado de una entidad dentro de Home Assistant
-    vía su API (usado para las cámaras, que no tienen IP propia accesible)
-  - `port`: para comprobar que un puerto TCP concreto responde, si algún
-    día tienes un dispositivo con IP/puerto propio accesible desde fuera
-  - `ping`: ping ICMP normal — ojo, no funciona contra la mayoría de
-    servicios detrás de DDNS/proxy, que suelen bloquear ICMP
+## Security Notes
+
+- All secrets are loaded from environment variables — never hardcoded
+- CSRF tokens required on all POST/PUT/DELETE endpoints
+- Session cookies: HttpOnly, SameSite=Lax, Secure (production)
+- Security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options
+- Login rate limiting (5 attempts per 5 minutes per IP)
+- Docker: read-only filesystem, no-new-privileges, all capabilities dropped
+- Non-root user inside container
+- DB connections use SSL (`sslmode=require`)
+- Input validation on all monitor creation/update
+
+## Migration from v1
+
+v1 used a simpler device model with just HTTP/ping/HA checks and SQLite. v2 brings:
+
+1. **PostgreSQL** — Replace SQLite with PostgreSQL (Supabase) for reliability
+2. **Extended monitor model** — Retries, intervals, dependencies, tags, state machine
+3. **New check types** — DNS, TLS, Docker, Heartbeat added
+4. **State machine** — Proper pending/up/down/degraded/maintenance states
+5. **Alerting** — Web Push, Telegram, Webhook with rate limiting
+6. **History** — State+message in history, uptime %, avg latency
+7. **Public status page** — No-auth API for external status displays
+8. **Bulk operations** — Manage multiple monitors at once
+9. **Export/Import** — Backup and migrate monitor configurations
+10. **Health endpoint** — For Docker/K8s health checks
+
+### Steps to migrate:
+1. Set up a PostgreSQL database (Supabase free tier works well)
+2. Update `.env` with new DB credentials
+3. The app will auto-create tables on first run
+4. Re-create your monitors via the API or UI (old SQLite data is not auto-migrated)
+
+## License
+
+Private project — not for redistribution.
