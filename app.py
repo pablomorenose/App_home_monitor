@@ -487,7 +487,7 @@ def api_status():
             effective_state = "up" if s["online"] else "down"
         else:
             effective_state = db_state
-        result.append({
+        entry = {
             "id": s["device_id"],
             "name": s["name"],
             "type": cfg.get("type"),
@@ -501,7 +501,87 @@ def api_status():
             "maintenance_until": maintenance_until,
             "in_maintenance": in_maintenance,
             "switch_state": s.get("switch_state"),
-        })
+        }
+
+        # Include system metrics inline for 'system' type monitors
+        if cfg.get("type") == "system":
+            try:
+                from checks import check_system
+                sys_result = check_system(timeout=int(cfg.get("timeout", 5)))
+                details = sys_result.get("details", {})
+                entry["cpu_pct"] = details.get("cpu_pct")
+                entry["ram_pct"] = details.get("ram_pct")
+                entry["ram_total_mb"] = details.get("ram_total_mb")
+                entry["ram_used_mb"] = details.get("ram_used_mb")
+                entry["temp_c"] = details.get("temp_c")
+                entry["disk_pct"] = details.get("disk_pct")
+                entry["disk_total_gb"] = details.get("disk_total_gb")
+                entry["disk_used_gb"] = details.get("disk_used_gb")
+                entry["uptime"] = details.get("uptime")
+            except Exception:
+                pass
+
+        # Include docker container info inline for 'docker' type monitors
+        if cfg.get("type") == "docker":
+            try:
+                import socket as _sock
+                import json as _json
+                container_name = cfg.get("container_name", cfg.get("id", ""))
+
+                def _docker_get(path):
+                    s = _sock.socket(_sock.AF_UNIX, _sock.SOCK_STREAM)
+                    s.settimeout(3)
+                    s.connect("/var/run/docker.sock")
+                    req = f"GET {path} HTTP/1.0\r\nHost: localhost\r\n\r\n"
+                    s.sendall(req.encode())
+                    resp = b""
+                    while True:
+                        chunk = s.recv(65536)
+                        if not chunk:
+                            break
+                        resp += chunk
+                    s.close()
+                    body = resp.split(b"\r\n\r\n", 1)[1]
+                    return _json.loads(body)
+
+                info = _docker_get(f"/containers/{container_name}/json")
+                state_info = info.get("State", {})
+                container_status = state_info.get("Status", "unknown")
+                running = state_info.get("Running", False)
+
+                docker_entry = {
+                    "container_name": container_name,
+                    "container_status": container_status,
+                    "running": running,
+                }
+
+                if running:
+                    try:
+                        stats = _docker_get(f"/containers/{container_name}/stats?stream=false")
+                        # CPU
+                        cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - stats["precpu_stats"]["cpu_usage"]["total_usage"]
+                        sys_delta = stats["cpu_stats"].get("system_cpu_usage", 0) - stats["precpu_stats"].get("system_cpu_usage", 0)
+                        if sys_delta > 0:
+                            docker_entry["cpu"] = f"{min(round((cpu_delta / sys_delta) * 100, 1), 100.0)}%"
+                        else:
+                            docker_entry["cpu"] = "0%"
+                        # Memory
+                        mem_usage = stats["memory_stats"].get("usage", 0) - stats["memory_stats"].get("stats", {}).get("cache", 0)
+                        docker_entry["mem"] = f"{round(mem_usage / 1048576, 1)}MB"
+                        # Network
+                        net_rx = sum(v["rx_bytes"] for v in stats.get("networks", {}).values())
+                        net_tx = sum(v["tx_bytes"] for v in stats.get("networks", {}).values())
+                        docker_entry["net"] = f"↓{round(net_rx/1048576,1)}MB ↑{round(net_tx/1048576,1)}MB"
+                    except Exception:
+                        docker_entry["cpu"] = "n/a"
+                        docker_entry["mem"] = "n/a"
+                        docker_entry["net"] = "n/a"
+
+                entry["docker_info"] = docker_entry
+            except Exception:
+                pass
+
+        result.append(entry)
     result.sort(key=lambda d: d["name"])
     return jsonify({"server_time": now, "devices": result})
 

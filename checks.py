@@ -534,6 +534,123 @@ def check_heartbeat(monitor_id: str, check_interval: int = 15,
 
 
 # ───────────────────────────────────────────────────────────────────
+# System Check (local host metrics)
+# ───────────────────────────────────────────────────────────────────
+
+def check_system(timeout: int = 5) -> dict:
+    """
+    Check local system metrics: CPU, RAM, temperature, disk, uptime.
+    Returns normalized result with extra details for the dashboard.
+    """
+    import shutil
+
+    start = time.monotonic()
+    cpu_pct = None
+    ram_pct = None
+    ram_total_mb = None
+    ram_used_mb = None
+    ram_avail_mb = None
+    temp_c = None
+    disk_pct = None
+    disk_total_gb = None
+    disk_used_gb = None
+    disk_free_gb = None
+    uptime_human = None
+
+    # --- CPU % (quick sample) ---
+    try:
+        with open("/proc/stat") as f:
+            line1 = f.readline().split()
+        time.sleep(0.3)
+        with open("/proc/stat") as f:
+            line2 = f.readline().split()
+        idle1 = int(line1[4]); total1 = sum(int(x) for x in line1[1:])
+        idle2 = int(line2[4]); total2 = sum(int(x) for x in line2[1:])
+        cpu_pct = round(100 * (1 - (idle2 - idle1) / (total2 - total1)), 1)
+    except Exception:
+        pass
+
+    # --- RAM ---
+    try:
+        mem = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                k, v = line.split(":"); mem[k.strip()] = int(v.split()[0])
+        ram_total_mb = mem["MemTotal"] // 1024
+        ram_avail_mb = mem["MemAvailable"] // 1024
+        ram_used_mb = ram_total_mb - ram_avail_mb
+        ram_pct = round(100 * ram_used_mb / ram_total_mb, 1)
+    except Exception:
+        pass
+
+    # --- Temperature ---
+    try:
+        result = subprocess.run(["vcgencmd", "measure_temp"], capture_output=True, text=True, timeout=2)
+        temp_str = result.stdout.strip().replace("temp=", "").replace("'C", "")
+        temp_c = float(temp_str)
+    except Exception:
+        try:
+            with open("/sys/class/thermal/thermal_zone0/temp") as f:
+                temp_c = round(int(f.read().strip()) / 1000, 1)
+        except Exception:
+            pass
+
+    # --- Disk ---
+    try:
+        disk = shutil.disk_usage("/")
+        disk_total_gb = round(disk.total / 1e9, 1)
+        disk_used_gb = round(disk.used / 1e9, 1)
+        disk_free_gb = round(disk.free / 1e9, 1)
+        disk_pct = round(100 * disk.used / disk.total, 1)
+    except Exception:
+        pass
+
+    # --- Uptime ---
+    try:
+        with open("/proc/uptime") as f:
+            uptime_secs = int(float(f.read().split()[0]))
+        days, rem = divmod(uptime_secs, 86400)
+        hours, rem = divmod(rem, 3600)
+        mins = rem // 60
+        uptime_human = (f"{days}d " if days else "") + f"{hours}h {mins}min"
+    except Exception:
+        pass
+
+    ms = round((time.monotonic() - start) * 1000)
+
+    # Determine state based on thresholds
+    state = "up"
+    message = "System OK"
+    if cpu_pct is not None and cpu_pct > 95:
+        state = "degraded"
+        message = f"CPU alta: {cpu_pct}%"
+    elif ram_pct is not None and ram_pct > 95:
+        state = "degraded"
+        message = f"RAM alta: {ram_pct}%"
+    elif disk_pct is not None and disk_pct > 95:
+        state = "degraded"
+        message = f"Disco lleno: {disk_pct}%"
+    elif temp_c is not None and temp_c > 80:
+        state = "degraded"
+        message = f"Temperatura alta: {temp_c}°C"
+
+    return _make_result(
+        state, message, latency_ms=ms,
+        cpu_pct=cpu_pct,
+        ram_pct=ram_pct,
+        ram_total_mb=ram_total_mb,
+        ram_used_mb=ram_used_mb,
+        ram_avail_mb=ram_avail_mb,
+        temp_c=temp_c,
+        disk_pct=disk_pct,
+        disk_total_gb=disk_total_gb,
+        disk_used_gb=disk_used_gb,
+        disk_free_gb=disk_free_gb,
+        uptime=uptime_human,
+    )
+
+
+# ───────────────────────────────────────────────────────────────────
 # Dispatcher
 # ───────────────────────────────────────────────────────────────────
 
@@ -608,6 +725,9 @@ def check_monitor(monitor: dict) -> dict:
             container_name=monitor.get("container_name", monitor.get("id", "")),
             timeout=timeout,
         )
+
+    if mtype == "system":
+        return check_system(timeout=timeout)
 
     if mtype == "heartbeat":
         return check_heartbeat(

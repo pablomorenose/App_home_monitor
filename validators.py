@@ -5,7 +5,7 @@ Validación de datos para monitores.
 import re
 from urllib.parse import urlparse
 
-VALID_TYPES = ("http", "ping", "port", "ha_entity", "ha_switch", "dns", "tls", "docker", "heartbeat")
+VALID_TYPES = ("http", "ping", "port", "ha_entity", "ha_switch", "dns", "tls", "docker", "heartbeat", "system")
 
 _ID_PATTERN = re.compile(r'^[a-zA-Z0-9_\-]{1,50}$')
 _STATUS_CODE_PATTERN = re.compile(r'^(\d{3}(-\d{3})?)(,\d{3}(-\d{3})?)*$')

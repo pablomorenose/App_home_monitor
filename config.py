@@ -84,6 +84,19 @@ DOCKER_METRICS_ENABLED = os.getenv("DOCKER_METRICS_ENABLED", "true").lower() == 
 # ────────────────────────────────────────────────────────────────────
 DEVICES = [
     {
+        "id": "raspberry_pi",
+        "name": "Raspberry Pi",
+        "type": "system",
+        "timeout": 5,
+    },
+    {
+        "id": "video_scanner",
+        "name": "Video Scanner",
+        "type": "http",
+        "url": "http://localhost:9090",
+        "timeout": 8,
+    },
+    {
         "id": "home_assistant",
         "name": "Home Assistant",
         "type": "http",
@@ -132,7 +145,21 @@ DEVICES = [
         "entity_id": "switch.adguard_home_proteccion",
         "timeout": 8,
     },
-] if HA_ENABLED else []
+] if HA_ENABLED else [
+    {
+        "id": "raspberry_pi",
+        "name": "Raspberry Pi",
+        "type": "system",
+        "timeout": 5,
+    },
+    {
+        "id": "video_scanner",
+        "name": "Video Scanner",
+        "type": "http",
+        "url": "http://localhost:9090",
+        "timeout": 8,
+    },
+]
 
 
 # ────────────────────────────────────────────────────────────────────
