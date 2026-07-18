@@ -6,6 +6,7 @@ Gestión de la base de datos PostgreSQL (Supabase).
 """
 
 import json
+import os
 import time
 from contextlib import contextmanager
 
@@ -78,6 +79,15 @@ def init_db():
             cur.execute("""
                 ALTER TABLE status_history
                 ADD COLUMN IF NOT EXISTS response_ms INTEGER
+            """)
+            # Phase 3/4: Add state and message columns to status_history
+            cur.execute("""
+                ALTER TABLE status_history
+                ADD COLUMN IF NOT EXISTS state TEXT NOT NULL DEFAULT 'up'
+            """)
+            cur.execute("""
+                ALTER TABLE status_history
+                ADD COLUMN IF NOT EXISTS message TEXT NOT NULL DEFAULT ''
             """)
             cur.execute("""
                 ALTER TABLE devices
@@ -178,7 +188,8 @@ def seed_devices_from_config():
 
 def update_status(device_id: str, name: str, online: bool,
                   error: str | None = None, response_ms: int | None = None,
-                  switch_state: str | None = None):
+                  switch_state: str | None = None,
+                  state: str = "up", message: str = ""):
     now = time.time()
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -195,8 +206,8 @@ def update_status(device_id: str, name: str, online: bool,
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """, (device_id, name, int(online), now, now, error, response_ms, switch_state))
                 cur.execute(
-                    "INSERT INTO status_history (device_id, online, ts, response_ms) VALUES (%s, %s, %s, %s)",
-                    (device_id, int(online), now, response_ms),
+                    "INSERT INTO status_history (device_id, online, ts, response_ms, state, message) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (device_id, int(online), now, response_ms, state, message),
                 )
                 return
 
@@ -213,8 +224,8 @@ def update_status(device_id: str, name: str, online: bool,
 
             # Guardar siempre la latencia para sparkline, solo guardar cambio de estado si cambio
             cur.execute(
-                "INSERT INTO status_history (device_id, online, ts, response_ms) VALUES (%s, %s, %s, %s)",
-                (device_id, int(online), now, response_ms),
+                "INSERT INTO status_history (device_id, online, ts, response_ms, state, message) VALUES (%s, %s, %s, %s, %s, %s)",
+                (device_id, int(online), now, response_ms, state, message),
             )
 
 
@@ -260,12 +271,186 @@ def set_maintenance(device_id: str, hours: float):
             )
 
 
-def cleanup_old_history(days: int = 30):
+def cleanup_old_history(days: int | None = None):
     """Borra registros de status_history con mas de `days` dias de antiguedad."""
+    if days is None:
+        days = int(os.getenv("HISTORY_RETENTION_DAYS", "30"))
     cutoff = time.time() - days * 86400
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM status_history WHERE ts < %s", (cutoff,))
+
+
+def cleanup_detailed_history(aggregate_after_days: int = 7):
+    """
+    Aggregates old per-minute data into hourly averages after `aggregate_after_days` days.
+    Reduces storage by replacing individual records with one per hour per device.
+    Records newer than aggregate_after_days are kept as-is.
+    """
+    cutoff = time.time() - aggregate_after_days * 86400
+    retention_days = int(os.getenv("HISTORY_RETENTION_DAYS", "30"))
+    oldest_keep = time.time() - retention_days * 86400
+
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Get distinct device_ids that have old detailed records
+            cur.execute("""
+                SELECT DISTINCT device_id FROM status_history
+                WHERE ts < %s AND ts >= %s
+            """, (cutoff, oldest_keep))
+            device_ids = [row["device_id"] for row in cur.fetchall()]
+
+            for device_id in device_ids:
+                # Get hourly aggregates for this device
+                cur.execute("""
+                    SELECT
+                        device_id,
+                        FLOOR(ts / 3600) * 3600 AS hour_ts,
+                        ROUND(AVG(CASE WHEN online = 1 THEN 1.0 ELSE 0.0 END)) AS avg_online,
+                        ROUND(AVG(response_ms)) AS avg_response_ms,
+                        MODE() WITHIN GROUP (ORDER BY state) AS mode_state,
+                        COUNT(*) AS cnt
+                    FROM status_history
+                    WHERE device_id = %s AND ts < %s AND ts >= %s
+                    GROUP BY device_id, FLOOR(ts / 3600) * 3600
+                    HAVING COUNT(*) > 1
+                """, (device_id, cutoff, oldest_keep))
+                aggregates = cur.fetchall()
+
+                for agg in aggregates:
+                    hour_ts = float(agg["hour_ts"])
+                    # Delete the detailed records for this hour
+                    cur.execute("""
+                        DELETE FROM status_history
+                        WHERE device_id = %s AND ts >= %s AND ts < %s
+                    """, (device_id, hour_ts, hour_ts + 3600))
+                    # Insert the aggregated record
+                    cur.execute("""
+                        INSERT INTO status_history (device_id, online, ts, response_ms, state, message)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        device_id,
+                        int(agg["avg_online"]),
+                        hour_ts,
+                        int(agg["avg_response_ms"]) if agg["avg_response_ms"] else None,
+                        agg["mode_state"] or "up",
+                        "",
+                    ))
+
+
+def get_uptime_percentage(device_id: str, hours: int = 24) -> float:
+    """
+    Calculates actual uptime percentage from history for the given time window.
+    Returns a float 0-100.
+    """
+    since = time.time() - hours * 3600
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT COUNT(*) AS total,
+                       SUM(CASE WHEN state IN ('up', 'degraded') THEN 1 ELSE 0 END) AS up_count
+                FROM status_history
+                WHERE device_id = %s AND ts >= %s
+            """, (device_id, since))
+            row = cur.fetchone()
+            if not row or not row["total"] or row["total"] == 0:
+                return 100.0
+            return round(float(row["up_count"]) / float(row["total"]) * 100, 2)
+
+
+def get_avg_latency(device_id: str, hours: int = 24) -> float | None:
+    """
+    Returns average response time in ms for the given time window.
+    Returns None if no data available.
+    """
+    since = time.time() - hours * 3600
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT AVG(response_ms) AS avg_ms
+                FROM status_history
+                WHERE device_id = %s AND ts >= %s AND response_ms IS NOT NULL
+            """, (device_id, since))
+            row = cur.fetchone()
+            if not row or row["avg_ms"] is None:
+                return None
+            return round(float(row["avg_ms"]), 1)
+
+
+def get_incidents_for_monitor(device_id: str, limit: int = 20) -> list[dict]:
+    """
+    Returns incidents (down periods) for a specific monitor with duration.
+    Each incident: {start_ts, end_ts, duration_seconds, state, message}
+    """
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Get state transitions to/from down for this device
+            cur.execute("""
+                SELECT ts, state, message, online
+                FROM status_history
+                WHERE device_id = %s
+                ORDER BY ts DESC
+                LIMIT 1000
+            """, (device_id,))
+            rows = [dict(r) for r in cur.fetchall()]
+
+    # Process rows (ordered DESC) to find incidents
+    # An incident starts when state becomes 'down' and ends when it becomes non-down
+    incidents = []
+    rows.reverse()  # Now ASC order
+
+    incident_start = None
+    incident_message = ""
+
+    for row in rows:
+        state = row.get("state", "up" if row["online"] else "down")
+        if state == "down" and incident_start is None:
+            incident_start = row["ts"]
+            incident_message = row.get("message", "")
+        elif state != "down" and incident_start is not None:
+            # Incident ended
+            duration = row["ts"] - incident_start
+            incidents.append({
+                "start_ts": incident_start,
+                "end_ts": row["ts"],
+                "duration_seconds": duration,
+                "state": "down",
+                "message": incident_message,
+            })
+            incident_start = None
+            incident_message = ""
+
+    # If currently in an incident (no recovery found)
+    if incident_start is not None:
+        duration = time.time() - incident_start
+        incidents.append({
+            "start_ts": incident_start,
+            "end_ts": None,
+            "duration_seconds": duration,
+            "state": "down",
+            "message": incident_message,
+        })
+
+    # Return most recent first, limited
+    incidents.reverse()
+    return incidents[:limit]
+
+
+def get_history_timeseries(device_id: str, hours: int = 24) -> list[dict]:
+    """
+    Returns time-series data for charting: [{ts, online, response_ms, state}]
+    Ordered ASC by timestamp.
+    """
+    since = time.time() - hours * 3600
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT ts, online, response_ms, state, message
+                FROM status_history
+                WHERE device_id = %s AND ts >= %s
+                ORDER BY ts ASC
+            """, (device_id, since))
+            return [dict(r) for r in cur.fetchall()]
 
 
 # -----------------------------------------------------------------------
@@ -418,6 +603,7 @@ def update_monitor_status(device_id: str, name: str, online: bool,
                           incident_id: str | None = None):
     """Actualiza el estado del monitor con campos de state machine."""
     now = time.time()
+    message = error or ""
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
@@ -452,10 +638,10 @@ def update_monitor_status(device_id: str, name: str, online: bool,
                       switch_state, state, consecutive_failures, consecutive_successes,
                       last_notification_ts, incident_id, device_id))
 
-            # Always record history
+            # Always record history with state and message
             cur.execute(
-                "INSERT INTO status_history (device_id, online, ts, response_ms) VALUES (%s, %s, %s, %s)",
-                (device_id, int(online), now, response_ms),
+                "INSERT INTO status_history (device_id, online, ts, response_ms, state, message) VALUES (%s, %s, %s, %s, %s, %s)",
+                (device_id, int(online), now, response_ms, state, message),
             )
 
 

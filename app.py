@@ -31,7 +31,9 @@ from csrf import get_csrf_token, csrf_protect
 from db import (delete_device, get_all_devices, get_all_statuses, get_history,
                 init_db, seed_devices_from_config, upsert_device, get_latency_history,
                 get_incidents, get_all_monitors, get_monitor, upsert_monitor,
-                get_monitor_statuses, update_heartbeat_ts)
+                get_monitor_statuses, update_heartbeat_ts,
+                get_uptime_percentage, get_avg_latency, get_incidents_for_monitor,
+                get_history_timeseries)
 from monitor_worker import run_checks_once, start_background_monitor
 from notifications import delete_subscription, init_push_table, save_subscription
 from validators import validate_monitor
@@ -730,6 +732,88 @@ def api_heartbeat(monitor_id):
     """Receives a heartbeat ping from an external service."""
     update_heartbeat_ts(monitor_id)
     return jsonify({"ok": True})
+
+
+# -----------------------------------------------------------------------
+# Phase 4: Stats & History endpoints
+# -----------------------------------------------------------------------
+
+@app.route("/api/monitors/<monitor_id>/stats")
+def api_monitor_stats(monitor_id):
+    """Returns stats for a specific monitor: uptime %, avg latency, incidents count."""
+    if require_auth():
+        return jsonify({"error": "No autorizado"}), 401
+
+    m = get_monitor(monitor_id)
+    if not m:
+        return jsonify({"error": "Monitor no encontrado"}), 404
+
+    statuses = {s["device_id"]: s for s in get_monitor_statuses()}
+    status = statuses.get(monitor_id, {})
+
+    uptime_24h = get_uptime_percentage(monitor_id, hours=24)
+    uptime_7d = get_uptime_percentage(monitor_id, hours=168)
+    avg_latency_24h = get_avg_latency(monitor_id, hours=24)
+    incidents = get_incidents_for_monitor(monitor_id, limit=100)
+    # Count incidents in last 24h
+    now = time.time()
+    cutoff_24h = now - 86400
+    incidents_24h = sum(1 for i in incidents if i["start_ts"] >= cutoff_24h)
+
+    return jsonify({
+        "monitor_id": monitor_id,
+        "uptime_pct_24h": uptime_24h,
+        "uptime_pct_7d": uptime_7d,
+        "avg_latency_24h": avg_latency_24h,
+        "incidents_count_24h": incidents_24h,
+        "current_state": status.get("state", "pending"),
+    })
+
+
+@app.route("/api/monitors/<monitor_id>/history")
+def api_monitor_history(monitor_id):
+    """Returns time-series history data for charting."""
+    if require_auth():
+        return jsonify({"error": "No autorizado"}), 401
+
+    m = get_monitor(monitor_id)
+    if not m:
+        return jsonify({"error": "Monitor no encontrado"}), 404
+
+    hours = request.args.get("hours", 24, type=int)
+    # Cap at 720 hours (30 days)
+    hours = min(hours, 720)
+    data = get_history_timeseries(monitor_id, hours=hours)
+    return jsonify({"monitor_id": monitor_id, "hours": hours, "data": data})
+
+
+@app.route("/api/stats/summary")
+def api_stats_summary():
+    """Global summary: total monitors, up/down/degraded counts, avg uptime."""
+    if require_auth():
+        return jsonify({"error": "No autorizado"}), 401
+
+    statuses = get_monitor_statuses()
+    total = len(statuses)
+    up_count = sum(1 for s in statuses if s.get("state") == "up")
+    down_count = sum(1 for s in statuses if s.get("state") == "down")
+    degraded_count = sum(1 for s in statuses if s.get("state") == "degraded")
+
+    # Calculate average uptime across all monitors
+    uptimes = []
+    for s in statuses:
+        device_id = s["device_id"]
+        uptime = get_uptime_percentage(device_id, hours=24)
+        uptimes.append(uptime)
+    avg_uptime = round(sum(uptimes) / len(uptimes), 2) if uptimes else 100.0
+
+    return jsonify({
+        "total_monitors": total,
+        "up": up_count,
+        "down": down_count,
+        "degraded": degraded_count,
+        "avg_uptime_24h": avg_uptime,
+    })
 
 
 # -----------------------------------------------------------------------
