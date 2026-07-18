@@ -889,13 +889,16 @@ function applyFilter(){
 
 async function refresh(){
   try{
-    const data=await(await fetch('/api/status')).json();
+    const res=await fetch('/api/status');
+    if(!res.ok){document.getElementById('footer-note').textContent='Error: '+res.status;return;}
+    const data=await res.json();
+    if(!data.devices){document.getElementById('footer-note').textContent='Error: no devices in response';return;}
     renderSummary(data.devices);
     renderDevices(data.devices);
     document.getElementById('footer-note').textContent=`Actualizado cada ${REFRESH_MS/1000}s · ${new Date(data.server_time*1000).toLocaleTimeString('es-ES')}`;
     loadHaSensors();
     applyFilter();
-  }catch{document.getElementById('footer-note').textContent='Sin conexion. Reintentando…';}
+  }catch(e){document.getElementById('footer-note').textContent='Error: '+e.message;}
 }
 refresh();setInterval(refresh,REFRESH_MS);
 
