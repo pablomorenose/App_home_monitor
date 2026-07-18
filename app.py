@@ -478,18 +478,28 @@ def api_status():
         since_seconds = now - s["last_change_ts"]
         cfg = devices_cfg.get(s["device_id"], {})
         maintenance_until = cfg.get("maintenance_until", 0)
+        in_maintenance = maintenance_until > now
+        # Derive effective state: maintenance overrides DB state
+        db_state = s.get("state", "pending")
+        if in_maintenance:
+            effective_state = "maintenance"
+        elif db_state == "pending":
+            effective_state = "up" if s["online"] else "down"
+        else:
+            effective_state = db_state
         result.append({
             "id": s["device_id"],
             "name": s["name"],
             "type": cfg.get("type"),
             "online": bool(s["online"]),
+            "state": effective_state,
             "since_seconds": since_seconds,
             "since_human": humanize_duration(since_seconds),
             "last_check_seconds_ago": now - s["last_check_ts"],
             "last_error": s["last_error"],
             "response_ms": s.get("response_ms"),
             "maintenance_until": maintenance_until,
-            "in_maintenance": maintenance_until > now,
+            "in_maintenance": in_maintenance,
             "switch_state": s.get("switch_state"),
         })
     result.sort(key=lambda d: d["name"])

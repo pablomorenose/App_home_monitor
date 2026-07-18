@@ -123,6 +123,9 @@
   .led{width:11px;height:11px;border-radius:50%;background:var(--text-tertiary);flex-shrink:0;transition:background .3s;}
   .led.on{background:var(--green);box-shadow:0 0 8px 2px rgba(52,199,89,.55);}
   .led.off{background:var(--red);box-shadow:0 0 8px 2px rgba(255,59,48,.55);animation:pulse 1.6s ease-in-out infinite;}
+  .led.degraded{background:var(--amber);box-shadow:0 0 8px 2px rgba(255,149,0,.55);}
+  .status-pill.degraded{color:var(--amber);background:color-mix(in srgb,var(--amber) 14%,transparent);}
+  .status-pill.maintenance{color:var(--text-dim);background:var(--track);}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
   .device-name-row{display:flex;align-items:center;gap:8px;min-width:0;flex:1;}
   .device-name{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.015em;}
@@ -420,6 +423,10 @@
         <option value="port">Puerto TCP</option>
         <option value="ha_entity">Entidad Home Assistant</option>
         <option value="ha_switch">Switch Home Assistant (toggle)</option>
+        <option value="dns">DNS — Resolución de dominio</option>
+        <option value="tls">TLS — Certificado SSL</option>
+        <option value="docker">Docker — Contenedor</option>
+        <option value="heartbeat">Heartbeat — Señal periódica</option>
       </select>
     </div>
     <div id="fields-http"><div class="fg"><label>URL</label><input type="text" id="f-url" placeholder="https://..."></div></div>
@@ -429,7 +436,40 @@
       <div class="fg"><label>Puerto</label><input type="number" id="f-port" placeholder="22"></div>
     </div>
     <div id="fields-ha" style="display:none"><div class="fg"><label>Entity ID de Home Assistant</label><input type="text" id="f-entity" placeholder="camera.sonoff1"></div></div>
+    <div id="fields-dns" style="display:none">
+      <div class="fg"><label>Host a resolver</label><input type="text" id="f-dns-host" placeholder="example.com"></div>
+      <div class="fg"><label>Valor esperado (IP)</label><input type="text" id="f-dns-expected" placeholder="93.184.216.34 (opcional)"></div>
+    </div>
+    <div id="fields-tls" style="display:none">
+      <div class="fg"><label>Host</label><input type="text" id="f-tls-host" placeholder="example.com"></div>
+      <div class="fg"><label>Días aviso expiración</label><input type="number" id="f-tls-warn-days" value="14" min="1" max="90"></div>
+    </div>
+    <div id="fields-docker" style="display:none">
+      <div class="fg"><label>Nombre del contenedor</label><input type="text" id="f-docker-container" placeholder="nginx"></div>
+    </div>
+    <div id="fields-heartbeat" style="display:none">
+      <div class="fg"><label>Intervalo esperado (segundos)</label><input type="number" id="f-heartbeat-interval" value="60" min="10"></div>
+    </div>
+    <div id="fields-http-advanced" style="display:none">
+      <div class="fg"><label>Método HTTP</label>
+        <select id="f-http-method">
+          <option value="GET">GET</option>
+          <option value="HEAD">HEAD</option>
+          <option value="POST">POST</option>
+        </select>
+      </div>
+      <div class="fg"><label>Códigos de estado esperados</label><input type="text" id="f-expected-status" placeholder="200,301 (por defecto: 200)"></div>
+      <div class="fg"><label>Palabra clave a verificar</label><input type="text" id="f-verify-keyword" placeholder="(opcional)"></div>
+      <div class="fg"><label>Seguir redirecciones</label>
+        <select id="f-follow-redirects">
+          <option value="true">Sí</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>Intervalo de comprobación (seg)</label><input type="number" id="f-check-interval" value="60" min="10" max="3600"></div>
     <div class="fg"><label>Timeout (segundos)</label><input type="number" id="f-timeout" value="8" min="1" max="30"></div>
+    <div class="fg"><label>Reintentos máximos</label><input type="number" id="f-max-retries" value="3" min="1" max="10"></div>
     <div class="modal-actions">
       <button class="btn-cancel2" onclick="closeModal()">Cancelar</button>
       <button class="btn-save" onclick="saveDevice()">Guardar</button>
@@ -507,9 +547,21 @@ function sparklineHtml(id){
 // Summary
 function renderSummary(devices){
   const bar=document.getElementById('summary-bar');
-  const total=devices.length,down=devices.filter(d=>!d.online).length;
-  bar.innerHTML=!down?`<div class="chip"><span class="dot"></span>${total} dispositivos · todo operativo</div>`
-    :`<div class="chip alert"><span class="dot"></span>${down} de ${total} caído${down>1?'s':''}</div><div class="chip">${total-down} operativos</div>`;
+  const total=devices.length;
+  const down=devices.filter(d=>d.state==='down').length;
+  const degraded=devices.filter(d=>d.state==='degraded').length;
+  const maint=devices.filter(d=>d.state==='maintenance').length;
+  const up=total-down-degraded-maint;
+  
+  if(!down && !degraded){
+    bar.innerHTML=`<div class="chip"><span class="dot"></span>${total} dispositivos · todo operativo</div>`;
+  } else {
+    let html='';
+    if(down) html+=`<div class="chip alert"><span class="dot"></span>${down} caído${down>1?'s':''}</div>`;
+    if(degraded) html+=`<div class="chip" style="color:var(--amber)"><span class="dot" style="background:var(--amber)"></span>${degraded} degradado${degraded>1?'s':''}</div>`;
+    html+=`<div class="chip">${up} operativo${up>1?'s':''}</div>`;
+    bar.innerHTML=html;
+  }
 }
 
 // ───── Iconos SVG reutilizables ─────
@@ -527,7 +579,7 @@ function renderDevices(devices){
   const collapsed=loadCollapsed();
   const list=document.getElementById('device-list');
   list.innerHTML=ordered.map(d=>{
-    const lc=d.online?'on':'off';
+    const lc=d.state==='degraded'?'degraded':(d.online?'on':'off');
     // AdGuard con protección desactivada: tono diferenciado (ámbar) aunque esté online
     const protectionOff = (d.type==='ha_switch' && d.switch_state==='off');
     // Estado plegado: ha_switch (AdGuard) PLEGADO por defecto; resto DESPLEGADO.
@@ -536,8 +588,8 @@ function renderDevices(devices){
     const defaultCollapsed = true;
     const isCollapsed = (typeof collapsed[d.id]==='boolean') ? collapsed[d.id] : defaultCollapsed;
     const rc=(d.online?'':'is-down')+(isCollapsed?' collapsed':'')+(protectionOff?' protection-off':'');
-    const sc=d.online?'up':'down';
-    const sl=d.online?'Online':'Offline';
+    const sc=d.state==='degraded'?'degraded':(d.state==='maintenance'?'maintenance':(d.online?'up':'down'));
+    const sl=d.state==='degraded'?'Degradado':(d.state==='maintenance'?'Mant.':(d.online?'Online':'Offline'));
     const since=d.online?`${d.since_human} en línea`:`caído hace ${d.since_human}`;
     const maintBadge=d.in_maintenance?`<span class="badge-maint">Mant.</span>`:'';
     const haSensors=d.id==='home_assistant'?`<div id="ha-sensors" class="ha-sensors"></div>`:'';
@@ -627,8 +679,19 @@ async function loadLatency(id){
 // Modal
 function updateFields(){
   const t=document.getElementById('f-type').value;
-  ['http','ping','port','ha'].forEach(k=>document.getElementById('fields-'+k).style.display=t===(k==='ha'?'ha_entity':k)?'':'none');
-  if(t==='ha_switch') document.getElementById('fields-ha').style.display='';
+  ['http','ping','port','ha','dns','tls','docker','heartbeat','http-advanced'].forEach(k=>{
+    const el=document.getElementById('fields-'+k);
+    if(!el)return;
+    el.style.display='none';
+  });
+  if(t==='http'){document.getElementById('fields-http').style.display='';document.getElementById('fields-http-advanced').style.display='';}
+  else if(t==='ping'){document.getElementById('fields-ping').style.display='';}
+  else if(t==='port'){document.getElementById('fields-port').style.display='';}
+  else if(t==='ha_entity'||t==='ha_switch'){document.getElementById('fields-ha').style.display='';}
+  else if(t==='dns'){document.getElementById('fields-dns').style.display='';}
+  else if(t==='tls'){document.getElementById('fields-tls').style.display='';}
+  else if(t==='docker'){document.getElementById('fields-docker').style.display='';}
+  else if(t==='heartbeat'){document.getElementById('fields-heartbeat').style.display='';}
 }
 function openModal(device){
   editingId=device?device.id:null;
@@ -643,6 +706,18 @@ function openModal(device){
   document.getElementById('f-port').value=device?.port||'';
   document.getElementById('f-entity').value=device?.entity_id||'';
   document.getElementById('f-timeout').value=device?.timeout||8;
+  document.getElementById('f-check-interval').value=device?.check_interval||60;
+  document.getElementById('f-max-retries').value=device?.max_retries||3;
+  document.getElementById('f-http-method').value=device?.http_method||'GET';
+  document.getElementById('f-expected-status').value=device?.expected_status_codes||'';
+  document.getElementById('f-verify-keyword').value=device?.verify_keyword||'';
+  document.getElementById('f-follow-redirects').value=device?.follow_redirects!==false?'true':'false';
+  document.getElementById('f-tls-host').value=device?.host||'';
+  document.getElementById('f-tls-warn-days').value=device?.tls_warn_days||14;
+  document.getElementById('f-dns-host').value=device?.host||'';
+  document.getElementById('f-dns-expected').value=device?.dns_expected||'';
+  document.getElementById('f-docker-container').value=device?.container_name||'';
+  document.getElementById('f-heartbeat-interval').value=device?.heartbeat_interval||60;
   updateFields();
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -653,12 +728,24 @@ async function saveDevice(){
   const name=document.getElementById('f-name').value.trim();
   const id=editingId||document.getElementById('f-id').value.trim().replace(/\s+/g,'_');
   const timeout=parseInt(document.getElementById('f-timeout').value)||8;
+  const check_interval=parseInt(document.getElementById('f-check-interval').value)||60;
+  const max_retries=parseInt(document.getElementById('f-max-retries').value)||3;
   if(!name||!id){alert('Nombre e ID son obligatorios');return;}
-  const device={id,name,type,timeout};
-  if(type==='http')device.url=document.getElementById('f-url').value.trim();
+  const device={id,name,type,timeout,check_interval,max_retries};
+  if(type==='http'){
+    device.url=document.getElementById('f-url').value.trim();
+    device.http_method=document.getElementById('f-http-method').value;
+    device.expected_status_codes=document.getElementById('f-expected-status').value.trim();
+    device.verify_keyword=document.getElementById('f-verify-keyword').value.trim();
+    device.follow_redirects=document.getElementById('f-follow-redirects').value==='true';
+  }
   if(type==='ping')device.host=document.getElementById('f-host-ping').value.trim();
   if(type==='port'){device.host=document.getElementById('f-host-port').value.trim();device.port=parseInt(document.getElementById('f-port').value);}
-  if(type==='ha_entity')device.entity_id=document.getElementById('f-entity').value.trim();
+  if(type==='ha_entity'||type==='ha_switch')device.entity_id=document.getElementById('f-entity').value.trim();
+  if(type==='dns'){device.host=document.getElementById('f-dns-host').value.trim();device.dns_expected=document.getElementById('f-dns-expected').value.trim();}
+  if(type==='tls'){device.host=document.getElementById('f-tls-host').value.trim();device.tls_warn_days=parseInt(document.getElementById('f-tls-warn-days').value)||14;}
+  if(type==='docker'){device.container_name=document.getElementById('f-docker-container').value.trim();}
+  if(type==='heartbeat'){device.heartbeat_interval=parseInt(document.getElementById('f-heartbeat-interval').value)||60;}
   await fetch(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(device)});
   closeModal();refresh();
 }
