@@ -18,6 +18,8 @@ Endpoints:
 """
 
 import time
+from collections import defaultdict
+import time as _time
 
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for
 
@@ -25,6 +27,7 @@ from config import (
     SECRET_KEY, ACCESS_PASSWORD, VAPID_PUBLIC_KEY, APP_ENV, PUSH_ENABLED,
     DOCKER_METRICS_ENABLED, validate_config,
 )
+from csrf import get_csrf_token, csrf_protect
 from db import (delete_device, get_all_devices, get_all_statuses, get_history,
                 init_db, seed_devices_from_config, upsert_device, get_latency_history,
                 get_incidents)
@@ -36,6 +39,12 @@ validate_config()
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=APP_ENV == 'production',
+    PERMANENT_SESSION_LIFETIME=86400,  # 24h
+)
 
 
 def humanize_duration(seconds: float) -> str:
@@ -59,6 +68,24 @@ def require_auth():
 
 
 # -----------------------------------------------------------------------
+# Rate limiting (login)
+# -----------------------------------------------------------------------
+
+_login_attempts = defaultdict(list)
+LOGIN_RATE_LIMIT = 5  # max attempts
+LOGIN_RATE_WINDOW = 300  # 5 minutes
+
+
+def _check_login_rate(ip):
+    now = _time.time()
+    _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < LOGIN_RATE_WINDOW]
+    if len(_login_attempts[ip]) >= LOGIN_RATE_LIMIT:
+        return False
+    _login_attempts[ip].append(now)
+    return True
+
+
+# -----------------------------------------------------------------------
 # Auth
 # -----------------------------------------------------------------------
 
@@ -66,8 +93,12 @@ def require_auth():
 def login():
     error = None
     if request.method == "POST":
+        if not _check_login_rate(request.remote_addr):
+            return render_template("login.html", error="Demasiados intentos. Espera 5 minutos."), 429
         if request.form.get("password") == ACCESS_PASSWORD:
+            session.clear()
             session["authenticated"] = True
+            get_csrf_token()  # regenerate CSRF token on login
             return redirect(url_for("index"))
         error = "Contraseña incorrecta"
     return render_template("login.html", error=error)
@@ -77,6 +108,11 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+@app.route("/api/csrf-token")
+def api_csrf_token():
+    return jsonify({"token": get_csrf_token()})
 
 
 # -----------------------------------------------------------------------
@@ -98,6 +134,7 @@ def historial():
 
 
 @app.route("/api/force-check", methods=["POST"])
+@csrf_protect
 def api_force_check():
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
     from monitor_worker import run_checks_once
@@ -107,6 +144,7 @@ def api_force_check():
 
 
 @app.route("/api/devices/<device_id>/maintenance", methods=["POST"])
+@csrf_protect
 def api_maintenance(device_id):
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
     hours = float(request.json.get("hours", 0))
@@ -116,6 +154,7 @@ def api_maintenance(device_id):
 
 
 @app.route("/api/toggle/<device_id>", methods=["POST"])
+@csrf_protect
 def api_toggle(device_id):
     """Activa o desactiva un switch de Home Assistant."""
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
@@ -561,6 +600,7 @@ def list_devices():
 
 
 @app.route("/api/devices", methods=["POST"])
+@csrf_protect
 def add_device():
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
     data = request.get_json()
@@ -571,6 +611,7 @@ def add_device():
 
 
 @app.route("/api/devices/<device_id>", methods=["PUT"])
+@csrf_protect
 def edit_device(device_id):
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
     data = request.get_json()
@@ -582,6 +623,7 @@ def edit_device(device_id):
 
 
 @app.route("/api/devices/<device_id>", methods=["DELETE"])
+@csrf_protect
 def remove_device(device_id):
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
     delete_device(device_id)
@@ -598,6 +640,7 @@ def vapid_key():
 
 
 @app.route("/api/subscribe", methods=["POST"])
+@csrf_protect
 def subscribe():
     sub = request.get_json()
     if not sub or "endpoint" not in sub:
@@ -607,6 +650,7 @@ def subscribe():
 
 
 @app.route("/api/unsubscribe", methods=["POST"])
+@csrf_protect
 def unsubscribe():
     data = request.get_json()
     if data and "endpoint" in data:
