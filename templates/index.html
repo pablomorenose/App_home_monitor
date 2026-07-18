@@ -424,6 +424,21 @@
 <script>
 const REFRESH_MS=15000,ORDER_KEY='homem_order',COLLAPSED_KEY='homem_collapsed';
 let editingId=null;
+let csrfToken='';
+
+// Fetch CSRF token on load
+(async()=>{try{const r=await(await fetch('/api/csrf-token')).json();csrfToken=r.token;}catch{}})();
+
+// Helper for POST/PUT/DELETE with CSRF
+function fetchApi(url, opts={}){
+  opts.headers=opts.headers||{};
+  opts.headers['X-CSRF-Token']=csrfToken;
+  if(opts.body && typeof opts.body==='object' && !(opts.body instanceof FormData)){
+    opts.headers['Content-Type']='application/json';
+    opts.body=JSON.stringify(opts.body);
+  }
+  return fetch(url, opts);
+}
 
 // Reloj
 function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-ES');}
@@ -734,7 +749,7 @@ async function saveDevice(){
   if(type==='tls'){device.host=document.getElementById('f-tls-host').value.trim();device.tls_warn_days=parseInt(document.getElementById('f-tls-warn-days').value)||14;}
   if(type==='docker'){device.container_name=document.getElementById('f-docker-container').value.trim();}
   if(type==='heartbeat'){device.heartbeat_interval=parseInt(document.getElementById('f-heartbeat-interval').value)||60;}
-  await fetch(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(device)});
+  await fetchApi(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',body:device});
   closeModal();refresh();
 }
 async function editDevice(id){
@@ -743,7 +758,7 @@ async function editDevice(id){
 }
 async function confirmDelete(id,name){
   if(!confirm(`¿Borrar "${name}"? Se eliminará también su historial.`))return;
-  await fetch(`/api/devices/${id}`,{method:'DELETE'});refresh();
+  await fetchApi(`/api/devices/${id}`,{method:'DELETE'});refresh();
 }
 
 // Toggle AdGuard
@@ -753,9 +768,8 @@ async function toggleSwitch(id, checked){
   const input = document.getElementById(`switch-input-${id}`);
   if(statusEl){ statusEl.textContent='...'; statusEl.className='switch-status-label off'; }
   try {
-    const res = await fetch(`/api/toggle/${id}`, {
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action})
+    const res = await fetchApi(`/api/toggle/${id}`, {
+      method:'POST',body:{action}
     });
     const data = await res.json();
     if(!data.ok){
@@ -838,11 +852,11 @@ async function loadHaSensors(){
 
 async function toggleMaintenance(id, isActive){
   if(isActive){
-    await fetch(`/api/devices/${id}/maintenance`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hours:0})});
+    await fetchApi(`/api/devices/${id}/maintenance`,{method:'POST',body:{hours:0}});
   } else {
     const h=prompt('Horas de mantenimiento (ej: 1, 2, 0.5):','1');
     if(!h)return;
-    await fetch(`/api/devices/${id}/maintenance`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hours:parseFloat(h)})});
+    await fetchApi(`/api/devices/${id}/maintenance`,{method:'POST',body:{hours:parseFloat(h)}});
   }
   refresh();
 }
@@ -850,7 +864,7 @@ async function toggleMaintenance(id, isActive){
 async function forceCheck(){
   const btn=document.getElementById('check-btn');
   btn.disabled=true;btn.style.opacity='.5';
-  await fetch('/api/force-check',{method:'POST'});
+  await fetchApi('/api/force-check',{method:'POST'});
   setTimeout(()=>{refresh();btn.disabled=false;btn.style.opacity='';}, 2000);
 }
 
@@ -909,7 +923,7 @@ async function toggleNotifications(){
   const sub=await swReg.pushManager.getSubscription();
   if(sub){
     await sub.unsubscribe();
-    await fetch('/api/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});
+    await fetchApi('/api/unsubscribe',{method:'POST',body:{endpoint:sub.endpoint}});
     btn.classList.remove('active');
     alert('Notificaciones desactivadas.');return;
   }
@@ -917,7 +931,7 @@ async function toggleNotifications(){
   if(perm!=='granted'){alert('Permiso de notificaciones denegado en el navegador.');return;}
   const{publicKey}=await(await fetch('/api/vapid-key')).json();
   const newSub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(publicKey)});
-  await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(newSub.toJSON())});
+  await fetchApi('/api/subscribe',{method:'POST',body:newSub.toJSON()});
   btn.classList.add('active');
   alert('Notificaciones activadas correctamente.');
 }
