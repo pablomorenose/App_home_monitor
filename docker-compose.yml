@@ -4,19 +4,33 @@ services:
     container_name: home-monitor
     restart: unless-stopped
     ports:
-      - "8088:8088"
+      - "127.0.0.1:8088:8088"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 256m
+    cpus: 0.5
     environment:
+      - APP_ENV=${APP_ENV:-production}
+      - SECRET_KEY=${SECRET_KEY}
+      - ACCESS_PASSWORD=${ACCESS_PASSWORD}
       - CHECK_INTERVAL_SECONDS=${CHECK_INTERVAL_SECONDS:-15}
-      - DATABASE_URL=${DATABASE_URL}
       - DB_HOST=${DB_HOST}
-      - DB_NAME=${DB_NAME}
+      - DB_NAME=${DB_NAME:-postgres}
       - DB_PASSWORD=${DB_PASSWORD}
-      - DB_PORT=${DB_PORT}
-      - DB_USER=${DB_USER}
-      - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN}
-      - HOME_ASSISTANT_URL=${HOME_ASSISTANT_URL}
-      - VAPID_CLAIMS_EMAIL=${VAPID_CLAIMS_EMAIL}
-      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
-      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-postgres}
+      - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN:-}
+      - HOME_ASSISTANT_URL=${HOME_ASSISTANT_URL:-}
+      - VAPID_CLAIMS_EMAIL=${VAPID_CLAIMS_EMAIL:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - DOCKER_METRICS_ENABLED=${DOCKER_METRICS_ENABLED:-true}
+      - TZ=${TZ:-Europe/Madrid}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}

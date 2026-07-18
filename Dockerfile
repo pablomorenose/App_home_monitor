@@ -1,17 +1,31 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS builder
 
-# Dependencias del sistema para psycopg2
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev gcc \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
+WORKDIR /build
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 iputils-ping curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -r -s /bin/false appuser
+
+COPY --from=builder /install /usr/local
+
+WORKDIR /app
 COPY . .
 
+RUN chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 8088
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:8088/login || exit 1
 
 CMD ["python", "app.py"]
