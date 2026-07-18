@@ -1,64 +1,81 @@
 """
 Configuración del Home Monitor.
-Los valores sensibles se leen desde variables de entorno (archivo .env).
-Para añadir o quitar dispositivos solo tienes que editar la lista DEVICES
-y reiniciar la app — no hay que tocar nada más.
+Los valores sensibles se leen exclusivamente desde variables de entorno (.env).
+Nunca se deben poner secretos en este archivo ni en Git.
 """
 
 import os
+import sys
+import logging
 
 from dotenv import load_dotenv
 
-# Carga el archivo .env si existe (en local). En producción (Oracle)
-# las variables se definen directamente en el entorno del servidor.
+# Carga .env si existe (desarrollo local). En producción las vars se
+# definen en el entorno del contenedor.
 load_dotenv()
 
-# --------------------------------------------------------------------
-# BASE DE DATOS (parámetros separados para evitar problemas con
-# caracteres especiales en la contraseña)
-# --------------------------------------------------------------------
-DB_HOST = os.getenv("DB_HOST", "db.fjyckjfrbpsneyhkrvsj.supabase.co")
+# ────────────────────────────────────────────────────────────────────
+# ENTORNO DE APLICACIÓN
+# ────────────────────────────────────────────────────────────────────
+APP_ENV = os.getenv("APP_ENV", "production")  # production | development
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+TZ = os.getenv("TZ", "Europe/Madrid")
+
+# Configurar logging global
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("config")
+
+# ────────────────────────────────────────────────────────────────────
+# SECRETOS Y AUTENTICACIÓN
+# ────────────────────────────────────────────────────────────────────
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD", "")
+
+# Si es true, permite arrancar sin ACCESS_PASSWORD (solo desarrollo)
+ALLOW_INSECURE_NO_AUTH = os.getenv("ALLOW_INSECURE_NO_AUTH", "false").lower() == "true"
+
+# ────────────────────────────────────────────────────────────────────
+# BASE DE DATOS
+# ────────────────────────────────────────────────────────────────────
+DB_HOST = os.getenv("DB_HOST", "")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "postgres")
 DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.environ["DB_PASSWORD"]
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 
-# --------------------------------------------------------------------
+# ────────────────────────────────────────────────────────────────────
 # CONFIGURACIÓN GENERAL
-# --------------------------------------------------------------------
+# ────────────────────────────────────────────────────────────────────
 CHECK_INTERVAL_SECONDS = int(os.getenv("CHECK_INTERVAL_SECONDS", "15"))
+MAX_CHECK_WORKERS = int(os.getenv("MAX_CHECK_WORKERS", "20"))
 
-# --------------------------------------------------------------------
-# VAPID — notificaciones push
-# --------------------------------------------------------------------
-VAPID_PRIVATE_KEY    = os.environ["VAPID_PRIVATE_KEY"]
-VAPID_PUBLIC_KEY     = os.environ["VAPID_PUBLIC_KEY"]
-VAPID_CLAIMS_EMAIL   = os.environ["VAPID_CLAIMS_EMAIL"]
+# ────────────────────────────────────────────────────────────────────
+# VAPID — notificaciones push (opcionales si no se usan)
+# ────────────────────────────────────────────────────────────────────
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+VAPID_CLAIMS_EMAIL = os.getenv("VAPID_CLAIMS_EMAIL", "")
+PUSH_ENABLED = bool(VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY and VAPID_CLAIMS_EMAIL)
 
-# --------------------------------------------------------------------
-# HOME ASSISTANT
-# --------------------------------------------------------------------
-HOME_ASSISTANT_URL = os.environ["HOME_ASSISTANT_URL"]
-HOME_ASSISTANT_TOKEN = os.environ["HOME_ASSISTANT_TOKEN"]
+# ────────────────────────────────────────────────────────────────────
+# HOME ASSISTANT (opcionales si no hay monitores HA)
+# ────────────────────────────────────────────────────────────────────
+HOME_ASSISTANT_URL = os.getenv("HOME_ASSISTANT_URL", "")
+HOME_ASSISTANT_TOKEN = os.getenv("HOME_ASSISTANT_TOKEN", "")
+HA_ENABLED = bool(HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN)
 
-# --------------------------------------------------------------------
-# DISPOSITIVOS A MONITORIZAR
-# --------------------------------------------------------------------
-# Para añadir un dispositivo nuevo, copia uno de los bloques de abajo
-# y ajusta los campos. Tipos disponibles:
-#
-#   "http"      -> comprueba que una URL responde (panel web, router...)
-#   "ping"      -> ping ICMP (solo para IPs accesibles directamente)
-#   "port"      -> comprueba que un puerto TCP está abierto
-#   "ha_entity" -> consulta el estado de una entidad en Home Assistant
-#                  (ideal para cámaras y dispositivos integrados en HA)
-#
-# Campos según el tipo:
-#   http      -> url, timeout
-#   ping      -> host, timeout
-#   port      -> host, port, timeout
-#   ha_entity -> entity_id, timeout
+# ────────────────────────────────────────────────────────────────────
+# DOCKER METRICS
+# ────────────────────────────────────────────────────────────────────
+DOCKER_METRICS_ENABLED = os.getenv("DOCKER_METRICS_ENABLED", "true").lower() == "true"
 
+# ────────────────────────────────────────────────────────────────────
+# DISPOSITIVOS INICIALES (seed) — se migran a BD en el primer arranque
+# ────────────────────────────────────────────────────────────────────
 DEVICES = [
     {
         "id": "home_assistant",
@@ -71,7 +88,7 @@ DEVICES = [
         "id": "nas_synology",
         "name": "NAS Synology",
         "type": "http",
-        "url": "https://antediluvian.synology.me:5001",
+        "url": os.getenv("NAS_URL", "https://nas.local:5001"),
         "timeout": 8,
     },
     {
@@ -109,4 +126,101 @@ DEVICES = [
         "entity_id": "switch.adguard_home_proteccion",
         "timeout": 8,
     },
-]
+] if HA_ENABLED else []
+
+
+# ────────────────────────────────────────────────────────────────────
+# VALIDACIÓN DE CONFIGURACIÓN
+# ────────────────────────────────────────────────────────────────────
+
+_INSECURE_SECRET_KEYS = {
+    "",
+    "homem-dev-secret-change-me",
+    "change-me",
+    "secret",
+    "dev",
+    "test",
+}
+
+
+def validate_config():
+    """
+    Valida la configuración al arranque.
+    En producción falla si faltan configuraciones críticas.
+    En desarrollo emite advertencias pero permite arrancar.
+    Nunca imprime valores de secretos en los mensajes de error.
+    """
+    errors = []
+    warnings = []
+
+    is_production = APP_ENV == "production"
+
+    # --- SECRET_KEY ---
+    if SECRET_KEY.lower() in _INSECURE_SECRET_KEYS:
+        msg = "SECRET_KEY no está configurada o usa un valor inseguro por defecto."
+        if is_production:
+            errors.append(msg)
+        else:
+            warnings.append(msg + " (aceptable solo en desarrollo)")
+
+    if SECRET_KEY and len(SECRET_KEY) < 16:
+        msg = "SECRET_KEY debe tener al menos 16 caracteres."
+        if is_production:
+            errors.append(msg)
+        else:
+            warnings.append(msg)
+
+    # --- ACCESS_PASSWORD ---
+    if not ACCESS_PASSWORD and not ALLOW_INSECURE_NO_AUTH:
+        msg = (
+            "ACCESS_PASSWORD no está configurada. "
+            "La app no arrancará sin autenticación en producción. "
+            "Para desarrollo sin auth, usa ALLOW_INSECURE_NO_AUTH=true."
+        )
+        if is_production:
+            errors.append(msg)
+        else:
+            warnings.append(msg)
+
+    # --- BASE DE DATOS ---
+    if not DB_HOST:
+        errors.append("DB_HOST es obligatorio.")
+    if not DB_PASSWORD:
+        errors.append("DB_PASSWORD es obligatorio.")
+
+    # --- CHECK_INTERVAL ---
+    if CHECK_INTERVAL_SECONDS < 5:
+        errors.append("CHECK_INTERVAL_SECONDS debe ser >= 5 para evitar sobrecarga.")
+
+    # --- VAPID (solo si push habilitado) ---
+    if PUSH_ENABLED:
+        if not VAPID_PRIVATE_KEY:
+            errors.append("VAPID_PRIVATE_KEY es obligatorio cuando Push está habilitado.")
+        if not VAPID_PUBLIC_KEY:
+            errors.append("VAPID_PUBLIC_KEY es obligatorio cuando Push está habilitado.")
+        if not VAPID_CLAIMS_EMAIL:
+            errors.append("VAPID_CLAIMS_EMAIL es obligatorio cuando Push está habilitado.")
+
+    # --- HOME ASSISTANT (solo si hay monitores HA) ---
+    # Se valida si HA_ENABLED está activo
+    if HA_ENABLED:
+        if not HOME_ASSISTANT_URL.startswith(("http://", "https://")):
+            errors.append("HOME_ASSISTANT_URL debe ser una URL válida (http:// o https://).")
+        if not HOME_ASSISTANT_TOKEN:
+            errors.append("HOME_ASSISTANT_TOKEN es obligatorio cuando hay monitores Home Assistant.")
+
+    # --- Emitir resultados ---
+    for w in warnings:
+        logger.warning("⚠️  CONFIG: %s", w)
+
+    if errors:
+        logger.error("=" * 60)
+        logger.error("CONFIGURACIÓN INVÁLIDA — La app no puede arrancar:")
+        logger.error("=" * 60)
+        for e in errors:
+            logger.error("  ✗ %s", e)
+        logger.error("=" * 60)
+        logger.error("Revisa tus variables de entorno (.env o Docker environment).")
+        sys.exit(1)
+
+    logger.info("✓ Configuración validada (%s)", APP_ENV)

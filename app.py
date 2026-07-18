@@ -17,23 +17,25 @@ Endpoints:
   DELETE /api/devices/<id>  -> borrar dispositivo
 """
 
-import os
 import time
 
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for
 
-from config import VAPID_PUBLIC_KEY
+from config import (
+    SECRET_KEY, ACCESS_PASSWORD, VAPID_PUBLIC_KEY, APP_ENV, PUSH_ENABLED,
+    DOCKER_METRICS_ENABLED, validate_config,
+)
 from db import (delete_device, get_all_devices, get_all_statuses, get_history,
                 init_db, seed_devices_from_config, upsert_device, get_latency_history,
                 get_incidents)
 from monitor_worker import run_checks_once, start_background_monitor
 from notifications import delete_subscription, init_push_table, save_subscription
 
-app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "homem-dev-secret-change-me")
+# Validar configuración antes de arrancar
+validate_config()
 
-# Contraseña de acceso (vacía = sin protección)
-ACCESS_PASSWORD = os.environ.get("ACCESS_PASSWORD", "")
+app = Flask(__name__)
+app.secret_key = SECRET_KEY
 
 
 def humanize_duration(seconds: float) -> str:
