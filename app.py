@@ -51,6 +51,40 @@ app.config.update(
 )
 
 
+# ─── Metrics cache (avoid slow calls on every /api/status request) ───
+_cache = {"system": {}, "system_ts": 0, "docker": [], "docker_ts": 0}
+_CACHE_TTL = 10  # seconds
+
+def _get_cached_system_metrics():
+    now = time.time()
+    if now - _cache["system_ts"] > _CACHE_TTL:
+        from checks import check_system
+        result = check_system(timeout=5)
+        details = result.get("details", {})
+        _cache["system"] = {
+            "cpu_pct": details.get("cpu_pct"),
+            "ram_pct": details.get("ram_pct"),
+            "ram_total_mb": details.get("ram_total_mb"),
+            "ram_used_mb": details.get("ram_used_mb"),
+            "temp_c": details.get("temp_c"),
+            "disk_pct": details.get("disk_pct"),
+            "disk_total_gb": details.get("disk_total_gb"),
+            "disk_used_gb": details.get("disk_used_gb"),
+            "uptime": details.get("uptime"),
+        }
+        _cache["system_ts"] = now
+    return _cache["system"]
+
+def _get_cached_docker_containers():
+    now = time.time()
+    if now - _cache["docker_ts"] > _CACHE_TTL:
+        from checks import get_all_docker_containers
+        result = get_all_docker_containers(timeout=5)
+        _cache["docker"] = result.get("containers", [])
+        _cache["docker_ts"] = now
+    return _cache["docker"]
+
+
 def humanize_duration(seconds: float) -> str:
     seconds = int(seconds)
     days, rem = divmod(seconds, 86400)
@@ -503,30 +537,17 @@ def api_status():
             "switch_state": s.get("switch_state"),
         }
 
-        # Include system metrics inline for 'system' type monitors
+        # Include system metrics inline for 'system' type monitors (cached)
         if cfg.get("type") == "system":
             try:
-                from checks import check_system
-                sys_result = check_system(timeout=int(cfg.get("timeout", 5)))
-                details = sys_result.get("details", {})
-                entry["cpu_pct"] = details.get("cpu_pct")
-                entry["ram_pct"] = details.get("ram_pct")
-                entry["ram_total_mb"] = details.get("ram_total_mb")
-                entry["ram_used_mb"] = details.get("ram_used_mb")
-                entry["temp_c"] = details.get("temp_c")
-                entry["disk_pct"] = details.get("disk_pct")
-                entry["disk_total_gb"] = details.get("disk_total_gb")
-                entry["disk_used_gb"] = details.get("disk_used_gb")
-                entry["uptime"] = details.get("uptime")
+                entry.update(_get_cached_system_metrics())
             except Exception:
                 pass
 
-        # Include docker container info inline for 'docker' type monitors
+        # Include docker container info inline for 'docker' type monitors (cached)
         if cfg.get("type") == "docker":
             try:
-                from checks import get_all_docker_containers
-                docker_result = get_all_docker_containers(timeout=int(cfg.get("timeout", 5)))
-                entry["containers"] = docker_result.get("containers", [])
+                entry["containers"] = _get_cached_docker_containers()
             except Exception:
                 entry["containers"] = []
 
