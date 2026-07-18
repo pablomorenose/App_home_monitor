@@ -25,7 +25,7 @@ from flask import Flask, jsonify, render_template, request, session, redirect, u
 
 from config import (
     SECRET_KEY, ACCESS_PASSWORD, VAPID_PUBLIC_KEY, APP_ENV, PUSH_ENABLED,
-    DOCKER_METRICS_ENABLED, validate_config,
+    DOCKER_METRICS_ENABLED, STATUS_PAGE_ENABLED, APP_VERSION, validate_config,
 )
 from csrf import get_csrf_token, csrf_protect
 from db import (delete_device, get_all_devices, get_all_statuses, get_history,
@@ -817,6 +817,239 @@ def api_stats_summary():
 
 
 # -----------------------------------------------------------------------
+# Phase 5: Status Page, Bulk Operations, Groups, Export/Import
+# -----------------------------------------------------------------------
+
+@app.route("/api/status-page")
+def api_status_page():
+    """Public status page endpoint — no auth required if enabled."""
+    if not STATUS_PAGE_ENABLED:
+        return jsonify({"error": "Status page disabled"}), 404
+
+    now = time.time()
+    cutoff_24h = now - 86400
+    monitors = get_all_monitors()
+    statuses = {s["device_id"]: s for s in get_monitor_statuses()}
+
+    monitor_list = []
+    down_count = 0
+    degraded_count = 0
+
+    for m in monitors:
+        status = statuses.get(m["id"], {})
+        state = status.get("state", "pending")
+        if state == "down":
+            down_count += 1
+        elif state == "degraded":
+            degraded_count += 1
+
+        uptime_24h = get_uptime_percentage(m["id"], hours=24)
+        avg_latency = get_avg_latency(m["id"], hours=24)
+
+        monitor_list.append({
+            "id": m["id"],
+            "name": m["name"],
+            "state": state,
+            "uptime_24h": uptime_24h,
+            "latency_ms": avg_latency,
+            "last_check": status.get("last_check_ts"),
+            "group": m.get("tags", "") or "Ungrouped",
+        })
+
+    # Determine overall status
+    total = len(monitors)
+    if down_count > 0 and down_count >= total * 0.5:
+        overall_status = "major_outage"
+    elif down_count > 0 or degraded_count > 0:
+        overall_status = "degraded"
+    else:
+        overall_status = "operational"
+
+    # Incidents in last 24h
+    incidents_24h = []
+    for m in monitors:
+        incidents = get_incidents_for_monitor(m["id"], limit=50)
+        for inc in incidents:
+            if inc["start_ts"] >= cutoff_24h:
+                incidents_24h.append({
+                    "monitor_id": m["id"],
+                    "monitor_name": m["name"],
+                    "start_ts": inc["start_ts"],
+                    "end_ts": inc["end_ts"],
+                    "duration_seconds": inc["duration_seconds"],
+                    "message": inc.get("message", ""),
+                })
+
+    incidents_24h.sort(key=lambda x: x["start_ts"], reverse=True)
+
+    return jsonify({
+        "overall_status": overall_status,
+        "monitors": monitor_list,
+        "incidents_24h": incidents_24h,
+        "last_updated": now,
+    })
+
+
+@app.route("/api/monitors/bulk-pause", methods=["POST"])
+@csrf_protect
+def api_bulk_pause():
+    """Put multiple monitors in maintenance mode."""
+    if require_auth():
+        return jsonify({"error": "No autorizado"}), 401
+    data = request.get_json()
+    if not data or "ids" not in data:
+        return jsonify({"error": "Campo 'ids' obligatorio"}), 400
+    ids = data["ids"]
+    if not isinstance(ids, list):
+        return jsonify({"error": "'ids' debe ser una lista"}), 400
+    hours = data.get("hours", 24)
+    from db import set_maintenance
+    count = 0
+    for monitor_id in ids:
+        if isinstance(monitor_id, str):
+            set_maintenance(monitor_id, hours)
+            count += 1
+    return jsonify({"ok": True, "paused": count})
+
+
+@app.route("/api/monitors/bulk-resume", methods=["POST"])
+@csrf_protect
+def api_bulk_resume():
+    """End maintenance for multiple monitors."""
+    if require_auth():
+        return jsonify({"error": "No autorizado"}), 401
+    data = request.get_json()
+    if not data or "ids" not in data:
+        return jsonify({"error": "Campo 'ids' obligatorio"}), 400
+    ids = data["ids"]
+    if not isinstance(ids, list):
+        return jsonify({"error": "'ids' debe ser una lista"}), 400
+    from db import set_maintenance
+    count = 0
+    for monitor_id in ids:
+        if isinstance(monitor_id, str):
+            set_maintenance(monitor_id, 0)
+            count += 1
+    return jsonify({"ok": True, "resumed": count})
+
+
+@app.route("/api/monitors/bulk-delete", methods=["POST"])
+@csrf_protect
+def api_bulk_delete():
+    """Delete multiple monitors."""
+    if require_auth():
+        return jsonify({"error": "No autorizado"}), 401
+    data = request.get_json()
+    if not data or "ids" not in data:
+        return jsonify({"error": "Campo 'ids' obligatorio"}), 400
+    ids = data["ids"]
+    if not isinstance(ids, list):
+        return jsonify({"error": "'ids' debe ser una lista"}), 400
+    count = 0
+    for monitor_id in ids:
+        if isinstance(monitor_id, str):
+            delete_device(monitor_id)
+            count += 1
+    return jsonify({"ok": True, "deleted": count})
+
+
+@app.route("/api/groups")
+def api_groups():
+    """Returns monitors grouped by their tags field."""
+    if require_auth():
+        return jsonify({"error": "No autorizado"}), 401
+    monitors = get_all_monitors()
+    statuses = {s["device_id"]: s for s in get_monitor_statuses()}
+    now = time.time()
+
+    groups = {}
+    for m in monitors:
+        status = statuses.get(m["id"], {})
+        monitor_data = {
+            "id": m["id"],
+            "name": m["name"],
+            "type": m["type"],
+            "state": status.get("state", "pending"),
+            "online": bool(status.get("online", 0)),
+            "response_ms": status.get("response_ms"),
+            "in_maintenance": m.get("maintenance_until", 0) > now,
+        }
+        tags = m.get("tags", "").strip()
+        group_name = tags if tags else "Ungrouped"
+        if group_name not in groups:
+            groups[group_name] = []
+        groups[group_name].append(monitor_data)
+
+    return jsonify({"groups": groups})
+
+
+@app.route("/api/export")
+def api_export():
+    """Export all monitors configuration as JSON (backup/migration)."""
+    if require_auth():
+        return jsonify({"error": "No autorizado"}), 401
+    monitors = get_all_monitors()
+    # Remove internal fields that shouldn't be exported
+    export_data = []
+    for m in monitors:
+        export_item = {k: v for k, v in m.items() if k not in ("created_at", "enabled")}
+        export_data.append(export_item)
+    return jsonify({
+        "version": "2.0.0",
+        "exported_at": time.time(),
+        "monitors": export_data,
+    })
+
+
+@app.route("/api/import", methods=["POST"])
+@csrf_protect
+def api_import():
+    """Import monitors from JSON. Validates each, skips duplicates."""
+    if require_auth():
+        return jsonify({"error": "No autorizado"}), 401
+    data = request.get_json()
+    if not data or "monitors" not in data:
+        return jsonify({"error": "Campo 'monitors' obligatorio"}), 400
+
+    monitors_data = data["monitors"]
+    if not isinstance(monitors_data, list):
+        return jsonify({"error": "'monitors' debe ser una lista"}), 400
+
+    existing_monitors = {m["id"] for m in get_all_monitors()}
+    imported = 0
+    skipped = 0
+    errors_list = []
+
+    for i, monitor in enumerate(monitors_data):
+        if not isinstance(monitor, dict):
+            errors_list.append(f"Item {i}: no es un objeto válido")
+            continue
+
+        # Skip duplicates
+        monitor_id = monitor.get("id", "")
+        if monitor_id in existing_monitors:
+            skipped += 1
+            continue
+
+        # Validate
+        validation_errors = validate_monitor(monitor)
+        if validation_errors:
+            errors_list.append(f"Item {i} ({monitor_id}): {'; '.join(validation_errors)}")
+            continue
+
+        upsert_monitor(monitor)
+        existing_monitors.add(monitor_id)
+        imported += 1
+
+    return jsonify({
+        "ok": True,
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors_list,
+    })
+
+
+# -----------------------------------------------------------------------
 # Push notifications
 # -----------------------------------------------------------------------
 
@@ -867,6 +1100,42 @@ def add_security_headers(response):
         "frame-ancestors 'self'"
     )
     return response
+
+
+# -----------------------------------------------------------------------
+# Phase 6: Health endpoint
+# -----------------------------------------------------------------------
+
+_app_start_time = time.time()
+
+
+@app.route("/health")
+def health_check():
+    """Health check endpoint — no auth required."""
+    uptime_seconds = int(time.time() - _app_start_time)
+
+    # Check DB connectivity
+    try:
+        from db import get_db
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM devices")
+                monitors_count = cur.fetchone()[0]
+        return jsonify({
+            "status": "ok",
+            "db": "connected",
+            "uptime_seconds": uptime_seconds,
+            "monitors_count": monitors_count,
+            "version": APP_VERSION,
+        })
+    except Exception:
+        return jsonify({
+            "status": "degraded",
+            "db": "disconnected",
+            "uptime_seconds": uptime_seconds,
+            "monitors_count": 0,
+            "version": APP_VERSION,
+        }), 503
 
 
 # -----------------------------------------------------------------------

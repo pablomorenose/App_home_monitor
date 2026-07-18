@@ -18,6 +18,7 @@ load_dotenv()
 # ENTORNO DE APLICACIÓN
 # ────────────────────────────────────────────────────────────────────
 APP_ENV = os.getenv("APP_ENV", "production")  # production | development
+APP_VERSION = "2.0.0"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 TZ = os.getenv("TZ", "Europe/Madrid")
 
@@ -67,6 +68,11 @@ PUSH_ENABLED = bool(VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY and VAPID_CLAIMS_EMAI
 HOME_ASSISTANT_URL = os.getenv("HOME_ASSISTANT_URL", "")
 HOME_ASSISTANT_TOKEN = os.getenv("HOME_ASSISTANT_TOKEN", "")
 HA_ENABLED = bool(HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN)
+
+# ────────────────────────────────────────────────────────────────────
+# STATUS PAGE (public, no auth required)
+# ────────────────────────────────────────────────────────────────────
+STATUS_PAGE_ENABLED = os.getenv("STATUS_PAGE_ENABLED", "true").lower() == "true"
 
 # ────────────────────────────────────────────────────────────────────
 # DOCKER METRICS
