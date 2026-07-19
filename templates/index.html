@@ -591,7 +591,7 @@ function renderDevices(devices){
       else list.appendChild(row);
       initInteractionsFor(row);
       // Cargar datos async solo al crear
-      loadUptime(d.id); loadLatency(d.id); if(d.type!=='system') loadHeartbeats(d.id);
+      loadUptime(d.id); loadLatency(d.id); loadHeartbeats(d.id);
     }
     prevEl=row;
   });
@@ -1047,19 +1047,51 @@ function applyFilter(){
   });
 }
 
+// Carga instantánea: cache del último estado en localStorage.
+// Al abrir la app se pinta lo cacheado sin esperar al primer fetch.
+const STATUS_CACHE_KEY='homem_status_cache';
+function paintStatus(data, opts={}){
+  renderSummary(data.devices);
+  renderDevices(data.devices);
+  loadHaSensors();
+  applyFilter();
+  const note=document.getElementById('footer-note');
+  if(opts.stale){
+    const age=Math.round((Date.now()/1000 - (data._cached_at||data.server_time))/60);
+    note.textContent=`Mostrando datos en caché${age>0?` de hace ${age} min`:''} · actualizando…`;
+  } else {
+    note.textContent=`Actualizado cada ${REFRESH_MS/1000}s · ${new Date(data.server_time*1000).toLocaleTimeString('es-ES')}`;
+  }
+}
+
 async function refresh(){
   try{
     const res=await fetch('/api/status');
     if(!res.ok){document.getElementById('footer-note').textContent='Error: '+res.status;return;}
     const data=await res.json();
     if(!data.devices){document.getElementById('footer-note').textContent='Error: no devices in response';return;}
-    renderSummary(data.devices);
-    renderDevices(data.devices);
-    document.getElementById('footer-note').textContent=`Actualizado cada ${REFRESH_MS/1000}s · ${new Date(data.server_time*1000).toLocaleTimeString('es-ES')}`;
-    loadHaSensors();
-    applyFilter();
+    paintStatus(data);
+    // Guardar copia para la próxima carga instantánea
+    try{
+      data._cached_at=Date.now()/1000;
+      localStorage.setItem(STATUS_CACHE_KEY, JSON.stringify(data));
+    }catch{}
   }catch(e){document.getElementById('footer-note').textContent='Error: '+e.message;}
 }
+
+// 1) Pintar caché antigua de inmediato (si existe) → apertura instantánea.
+(function initFromCache(){
+  try{
+    const raw=localStorage.getItem(STATUS_CACHE_KEY);
+    if(raw){
+      const data=JSON.parse(raw);
+      if(data && data.devices && data.devices.length){
+        paintStatus(data, {stale:true});
+      }
+    }
+  }catch{}
+})();
+// 2) Refresco en segundo plano (fetch real) y cada REFRESH_MS.
 refresh();setInterval(refresh,REFRESH_MS);
 
 // Pull-to-refresh
