@@ -213,32 +213,24 @@
   .sparkline-wrap{margin-top:6px;}
   .sparkline svg{display:block;}
 
-  /* ── Heartbeat bar (estilo Uptime Kuma · 3 círculos por check) ── */
-  .heartbeat-bar{
-    display:flex;align-items:flex-end;gap:3px;
-    margin-top:10px;padding:9px 0 4px;
-    border-top:1px solid color-mix(in srgb,var(--text) 7%,transparent);
-    overflow-x:auto;scrollbar-width:none;
-  }
-  .heartbeat-bar::-webkit-scrollbar{display:none;}
-  .hb-label{
-    font-family:var(--mono);font-size:9px;color:var(--text-dim);
-    text-transform:uppercase;letter-spacing:.06em;
-    margin-right:auto;align-self:center;padding-right:8px;flex-shrink:0;
+  /* ── Heartbeat en cabecera (3 círculos por check · estilo Uptime Kuma) ── */
+  .hb-header{
+    display:flex;align-items:center;gap:3px;flex-shrink:0;
+    min-width:0;overflow:hidden;max-width:42vw;
+    margin-left:auto;padding:0 2px;
   }
   .hb-col{
     display:flex;flex-direction:column;gap:2px;align-items:center;
-    flex-shrink:0;padding:2px 1px;cursor:default;
-    transition:transform .12s;
+    flex-shrink:0;padding:1px;cursor:default;transition:transform .12s;
   }
-  .hb-col:hover{transform:translateY(-2px);}
-  .hb-col:hover .hb-dot{filter:brightness(1.3);}
-  .hb-dot{width:5px;height:5px;border-radius:50%;background:var(--text-tertiary);opacity:.85;transition:filter .12s;}
+  .hb-col:hover{transform:translateY(-1px);}
+  .hb-col:hover .hb-dot{filter:brightness(1.35);}
+  .hb-dot{width:4px;height:4px;border-radius:50%;background:var(--text-tertiary);opacity:.85;transition:filter .12s;}
   .hb-col.up .hb-dot{background:var(--green);}
   .hb-col.down .hb-dot{background:var(--red);}
   .hb-col.degraded .hb-dot{background:var(--amber);}
   .hb-col.pending .hb-dot,.hb-col.maintenance .hb-dot{background:var(--text-tertiary);opacity:.4;}
-  .hb-col.empty .hb-dot{background:var(--text-tertiary);opacity:.18;}
+  .hb-empty{font-size:10px;color:var(--text-tertiary);font-style:italic;}
 
   /* ── Uptime (solo texto, sin barra) ── */
   .uptime-pct{font-family:var(--mono);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;}
@@ -555,128 +547,229 @@ const ICONS={
   trash:'<svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>'
 };
 
-// Render de tarjetas
+// Render de tarjetas — render diferencial in-place para evitar flicker.
+const HB_CACHE = {};           // heartbeats por id (para no perderlos al refrescar)
+const UPTIME_CACHE = {};       // uptime % por id
+const ROW_SIG = {};            // signature de la última renderización por id
+
+function deviceSignature(d){
+  // Campos que afectan a la cabecera + cuerpo estático (no a datos async)
+  return JSON.stringify([
+    d.id, d.name, d.type, d.state, d.online, d.in_maintenance,
+    d.switch_state, d.since_human, d.last_error, d.response_ms,
+    d.cpu_pct, d.ram_pct, d.temp_c, d.disk_pct, d.uptime,
+    d.containers ? d.containers.length : 0,
+  ]);
+}
+
 function renderDevices(devices){
   const ordered=applyOrder(devices);
   const collapsed=loadCollapsed();
   const list=document.getElementById('device-list');
-  list.innerHTML=ordered.map(d=>{
-    const lc=d.state==='degraded'?'degraded':(d.online?'on':'off');
-    // AdGuard con protección desactivada: tono diferenciado (ámbar) aunque esté online
-    const protectionOff = (d.type==='ha_switch' && d.switch_state==='off');
-    // Estado plegado: ha_switch (AdGuard) PLEGADO por defecto; resto DESPLEGADO.
-    // El interruptor de AdGuard vive fuera del cuerpo plegable, así que sigue visible.
-    // Si el usuario ya tiene preferencia guardada, se respeta.
-    const defaultCollapsed = true;
-    const isCollapsed = (typeof collapsed[d.id]==='boolean') ? collapsed[d.id] : defaultCollapsed;
-    const rc=(d.online?'':'is-down')+(isCollapsed?' collapsed':'')+(protectionOff?' protection-off':'');
-    const sc=d.state==='degraded'?'degraded':(d.state==='maintenance'?'maintenance':(d.online?'up':'down'));
-    const sl=d.state==='degraded'?'Degradado':(d.state==='maintenance'?'Mant.':(d.online?'Online':'Offline'));
-    const since=d.online?`${d.since_human} en línea`:`caído hace ${d.since_human}`;
-    const maintBadge=d.in_maintenance?`<span class="badge-maint">Mant.</span>`:'';
-    const haSensors=d.id==='home_assistant'?`<div id="ha-sensors" class="ha-sensors"></div>`:'';
-    const extraSensors=(d.id==='adguard')?`<div id="adguard-sensors" class="ha-sensors"></div>`:'';
-
-    // System metrics (CPU/RAM/Temp/Disk bars) for type 'system'
-    let systemMetricsHtml = '';
-    if(d.type==='system' && d.cpu_pct!=null){
-      const tempColor = d.temp_c==null?'var(--green)':d.temp_c<70?'var(--green)':d.temp_c<90?'var(--amber)':'var(--red)';
-      const cpuColor  = d.cpu_pct==null?'var(--green)':d.cpu_pct<70?'var(--green)':d.cpu_pct<90?'var(--amber)':'var(--red)';
-      const ramColor  = d.ram_pct==null?'var(--green)':d.ram_pct<70?'var(--green)':d.ram_pct<90?'var(--amber)':'var(--red)';
-      const diskColor = d.disk_pct==null?'var(--green)':d.disk_pct<70?'var(--green)':d.disk_pct<90?'var(--amber)':'var(--red)';
-      systemMetricsHtml=`
-        <div class="sys-row"><span class="sys-label">CPU</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.cpu_pct??0}%;background:${cpuColor}"></div></div><span class="sys-val">${d.cpu_pct!=null?d.cpu_pct+'%':'—'}</span></div>
-        <div class="sys-row"><span class="sys-label">RAM</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.ram_pct??0}%;background:${ramColor}"></div></div><span class="sys-val">${d.ram_pct!=null?d.ram_pct+'%':'—'}</span></div>
-        <div class="sys-row"><span class="sys-label">TEMP</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.temp_c!=null?Math.min(d.temp_c,100):0}%;background:${tempColor}"></div></div><span class="sys-val">${d.temp_c!=null?d.temp_c+'°C':'—'}</span></div>
-        <div class="sys-row"><span class="sys-label">DISK</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.disk_pct??0}%;background:${diskColor}"></div></div><span class="sys-val">${d.disk_pct!=null?d.disk_pct+'%':'—'}</span></div>
-        <div class="since-row" style="margin-top:6px;">Uptime: ${d.uptime||'—'}</div>
-      `;
+  const newIds=new Set(ordered.map(d=>d.id));
+  // 1) Eliminar filas que ya no existen
+  list.querySelectorAll('.device-row').forEach(r=>{ if(!newIds.has(r.dataset.id)) r.remove(); });
+  // 2) Para cada device: crear o actualizar in-place
+  let prevEl=null;
+  ordered.forEach(d=>{
+    let row=list.querySelector(`.device-row[data-id="${d.id}"]`);
+    const sig=deviceSignature(d);
+    if(row){
+      // Mover a su posición si el orden cambió
+      const correctPos = prevEl ? prevEl.nextElementSibling : list.firstChild;
+      if(row!==correctPos) list.insertBefore(row, correctPos);
+      // Actualizar solo si cambió la signature
+      if(ROW_SIG[d.id]!==sig){
+        updateRowInPlace(row, d, collapsed[d.id]);
+        ROW_SIG[d.id]=sig;
+      }
+    } else {
+      // Crear nueva fila
+      row=createRow(d, collapsed[d.id]);
+      ROW_SIG[d.id]=sig;
+      if(prevEl) prevEl.after(row);
+      else list.appendChild(row);
+      initInteractionsFor(row);
+      // Cargar datos async solo al crear
+      loadUptime(d.id); loadLatency(d.id); if(d.type!=='system') loadHeartbeats(d.id);
     }
+    prevEl=row;
+  });
+  loadHaSensors();
+}
 
-    // Docker container info for type 'docker'
-    let dockerMetricsHtml = '';
-    if(d.type==='docker' && d.containers && d.containers.length){
-      const items = d.containers.map(c => {
-        const isRunning = c.state === 'running';
-        return `<div class="docker-container-item">
-          <div class="docker-container-header" onclick="this.parentElement.classList.toggle('expanded')">
-            <div class="led ${isRunning?'on':'off'}" style="width:8px;height:8px;min-width:8px"></div>
-            <span style="font-size:12px;font-weight:500;">${c.name}</span>
-            <span style="margin-left:auto;font-size:11px;color:var(--text-dim)">${c.status||c.state}</span>
-            <span class="collapse-btn" style="margin-left:6px">${ICONS.chevron}</span>
-          </div>
-          ${isRunning?`<div class="docker-container-body">
-            <div class="sys-row"><span class="sys-label" style="width:70px">CPU</span><span class="sys-val" style="width:auto;color:var(--text)">${c.cpu||'n/a'}</span></div>
-            <div class="sys-row"><span class="sys-label" style="width:70px">RAM</span><span class="sys-val" style="width:auto;color:var(--text)">${c.mem||'n/a'}</span></div>
-            <div class="sys-row"><span class="sys-label" style="width:70px">Red</span><span class="sys-val" style="width:auto;color:var(--text-dim)">${c.net||'n/a'}</span></div>
-          </div>`:''}
-        </div>`;
-      }).join('');
-      dockerMetricsHtml = `<div class="docker-containers">${items}</div>`;
-    }
+// ───── Construcción estática de una fila (solo al crear) ─────
+function buildHeaderState(d){
+  const lc=d.state==='degraded'?'degraded':(d.online?'on':'off');
+  const protectionOff=(d.type==='ha_switch' && d.switch_state==='off');
+  const isDown = !d.online;
+  return {lc, protectionOff, isDown};
+}
 
-    // Fila PROTECCIÓN para ha_switch (dentro del body desplegable)
-    const switchRow = (d.type==='ha_switch') ? `
-      <div class="switch-row">
-        <div class="switch-info">
-          <span class="switch-title">Bloqueo de anuncios</span>
-          <span class="switch-sub">Protección DNS de AdGuard</span>
-        </div>
-        <div class="switch-control">
-          <span class="switch-status-label ${d.switch_state==='on'?'on':'off'}" id="switch-status-${d.id}">
-            ${d.switch_state==='on'?'Activado':(d.switch_state==='off'?'Desactivado':'—')}
-          </span>
-          <label class="ios-toggle" onclick="event.stopPropagation()">
-            <input type="checkbox" id="switch-input-${d.id}" ${d.switch_state==='on'?'checked':''}
-              onchange="toggleSwitch('${d.id}', this.checked)">
-            <span class="ios-toggle-track"></span>
-          </label>
-        </div>
-      </div>` : '';
+function createRow(d, collapsedPref){
+  const {lc,protectionOff}=buildHeaderState(d);
+  const defaultCollapsed=true;
+  const isCollapsed=(typeof collapsedPref==='boolean')?collapsedPref:defaultCollapsed;
+  const rc=(d.online?'':'is-down')+(isCollapsed?' collapsed':'')+(protectionOff?' protection-off':'');
+  const maintBadge=d.in_maintenance?`<span class="badge-maint">Mant.</span>`:'';
+  const haSensors=d.id==='home_assistant'?`<div id="ha-sensors" class="ha-sensors"></div>`:'';
+  const extraSensors=(d.id==='adguard')?`<div id="adguard-sensors" class="ha-sensors"></div>`:'`;
 
-    // Right column: uptime for system type shows uptime text, else latency
-    const rightContent = d.type==='system' && d.uptime
-      ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--text-dim)"><div>Uptime</div><div style="font-weight:600;color:var(--text);margin-top:2px">${d.uptime}</div></div>`
-      : `${latencyHtml(d.response_ms)}<div class="uptime-pct" id="uptime-pct-${d.id}">…</div>`;
-
-    return`<div class="device-row ${rc}" draggable="true" data-id="${d.id}">
-      <div class="device-header">
-        <div class="led ${lc}"></div>
-        <div class="device-name-row">
-          <span class="device-name">${d.name}</span>
-          ${maintBadge}
-        </div>
-        <span class="status-pill ${sc}">${sl}</span>
-        <span class="collapse-btn">${ICONS.chevron}</span>
-        <span class="drag-handle">${ICONS.grip}</span>
+  const row=document.createElement('div');
+  row.className=`device-row ${rc}`;
+  row.draggable=true;
+  row.dataset.id=d.id;
+  row.innerHTML=`
+    <div class="device-header">
+      <div class="led ${lc}"></div>
+      <div class="device-name-row">
+        <span class="device-name">${d.name}</span>
+        ${maintBadge}
       </div>
-      <div class="device-body"><div class="device-body-inner">
-        ${switchRow}
-        <div class="device-body-content">
-          <div class="device-left">
-            ${systemMetricsHtml || `<div class="since-row">${since}</div>`}
-            ${d.type!=='system' && d.last_error?`<div class="error-text">${d.last_error.replace(/camera/gi,'cam\u200Bera').replace(/tracker/gi,'trac\u200Bker').replace(/ads?[\s._-]/gi,m=>'a\u200B'+m.slice(1))}</div>`:''}
-            ${haSensors}
-            ${extraSensors}
-            ${d.type!=='system'?sparklineHtml(d.id):''}
-            ${d.type!=='system'?`<div class="heartbeat-bar" id="hb-${d.id}"><span class="hb-label">Historial</span></div>`:''}
-          </div>
-          <div class="device-right">
-            ${rightContent}
-          </div>
+      <span class="hb-header" id="hb-${d.id}" aria-label="Historial de checks">
+        <span class="hb-empty">…</span>
+      </span>
+      <span class="collapse-btn">${ICONS.chevron}</span>
+      <span class="drag-handle">${ICONS.grip}</span>
+    </div>
+    <div class="device-body"><div class="device-body-inner">
+      <div class="device-body-slot-switch"></div>
+      <div class="device-body-content">
+        <div class="device-left">
+          <div class="device-left-slot"></div>
+          ${haSensors}
+          ${extraSensors}
+          ${d.type!=='system'?sparklineHtml(d.id):''}
         </div>
-        ${dockerMetricsHtml}
-        <div class="device-actions">
-          <button class="act-btn edit" title="Editar" aria-label="Editar" onclick="editDevice('${d.id}')">${ICONS.edit}</button>
-          <button class="act-btn maint ${d.in_maintenance?'active':''}" title="Mantenimiento" aria-label="Mantenimiento" onclick="toggleMaintenance('${d.id}',${d.in_maintenance})">${ICONS.wrench}</button>
-          <button class="act-btn del" title="Borrar" aria-label="Borrar" onclick="confirmDelete('${d.id}','${d.name}')">${ICONS.trash}</button>
-        </div>
-      </div></div>
+        <div class="device-right"></div>
+      </div>
+      <div class="docker-slot"></div>
+      <div class="device-actions">
+        <button class="act-btn edit" title="Editar" aria-label="Editar" onclick="editDevice('${d.id}')">${ICONS.edit}</button>
+        <button class="act-btn maint ${d.in_maintenance?'active':''}" title="Mantenimiento" aria-label="Mantenimiento" onclick="toggleMaintenance('${d.id}',${d.in_maintenance})">${ICONS.wrench}</button>
+        <button class="act-btn del" title="Borrar" aria-label="Borrar" onclick="confirmDelete('${d.id}','${d.name}')">${ICONS.trash}</button>
+      </div>
+    </div></div>`;
+  updateRowInPlace(row, d, collapsedPref);
+  return row;
+}
+
+// ───── Actualización in-place (sin reconstruir nada async) ─────
+function updateRowInPlace(row, d, collapsedPref){
+  const {lc,protectionOff,isDown}=buildHeaderState(d);
+  const defaultCollapsed=true;
+  const isCollapsed=(typeof collapsedPref==='boolean')?collapsedPref:defaultCollapsed;
+  // Classes de la fila
+  row.classList.toggle('is-down', isDown);
+  row.classList.toggle('collapsed', isCollapsed);
+  row.classList.toggle('protection-off', !!protectionOff);
+  // LED
+  const led=row.querySelector('.device-header > .led');
+  if(led){
+    led.className=`led ${lc}`;
+  }
+  // Name + badge (por si cambia nombre o mantenimiento)
+  const nameEl=row.querySelector('.device-name');
+  if(nameEl && nameEl.textContent!==d.name) nameEl.textContent=d.name;
+  const nameRow=row.querySelector('.device-name-row');
+  if(nameRow){
+    const existingBadge=nameRow.querySelector('.badge-maint');
+    if(d.in_maintenance && !existingBadge){
+      nameRow.insertAdjacentHTML('beforeend','<span class="badge-maint">Mant.</span>');
+    } else if(!d.in_maintenance && existingBadge){
+      existingBadge.remove();
+    }
+  }
+  // Maintenance button active state
+  const maintBtn=row.querySelector('.act-btn.maint');
+  if(maintBtn) maintBtn.classList.toggle('active', !!d.in_maintenance);
+
+  // Cuerpo desplegable
+  const switchSlot=row.querySelector('.device-body-slot-switch');
+  const leftSlot=row.querySelector('.device-left-slot');
+  const rightEl=row.querySelector('.device-right');
+  const dockerSlot=row.querySelector('.docker-slot');
+  if(switchSlot) switchSlot.innerHTML=buildSwitchRow(d);
+  if(leftSlot) leftSlot.innerHTML=buildLeftContent(d);
+  if(rightEl) rightEl.innerHTML=buildRightContent(d);
+  if(dockerSlot) dockerSlot.innerHTML=buildDockerHtml(d);
+
+  // Mantener datos async que ya teníamos (puntos y uptime) si los hay
+  if(HB_CACHE[d.id]) paintHeartbeats(d.id, HB_CACHE[d.id]);
+  if(UPTIME_CACHE[d.id]){
+    const pctEl=row.querySelector(`#uptime-pct-${d.id}`);
+    if(pctEl){pctEl.textContent='↑ '+UPTIME_CACHE[d.id].pct+'%';pctEl.style.color=UPTIME_CACHE[d.id].col;}
+  }
+  if(sparkCache[d.id]){
+    const sp=row.querySelector('.sparkline-wrap');
+    if(sp) sp.outerHTML=sparklineHtml(d.id);
+  }
+}
+
+function buildSwitchRow(d){
+  if(d.type!=='ha_switch') return '';
+  return `<div class="switch-row">
+    <div class="switch-info">
+      <span class="switch-title">Bloqueo de anuncios</span>
+      <span class="switch-sub">Protección DNS de AdGuard</span>
+    </div>
+    <div class="switch-control">
+      <span class="switch-status-label ${d.switch_state==='on'?'on':'off'}" id="switch-status-${d.id}">
+        ${d.switch_state==='on'?'Activado':(d.switch_state==='off'?'Desactivado':'—')}
+      </span>
+      <label class="ios-toggle" onclick="event.stopPropagation()">
+        <input type="checkbox" id="switch-input-${d.id}" ${d.switch_state==='on'?'checked':''}
+          onchange="toggleSwitch('${d.id}', this.checked)">
+        <span class="ios-toggle-track"></span>
+      </label>
+    </div>
+  </div>`;
+}
+
+function buildLeftContent(d){
+  const since=d.online?`${d.since_human} en línea`:`caído hace ${d.since_human}`;
+  if(d.type==='system' && d.cpu_pct!=null){
+    const tempColor = d.temp_c==null?'var(--green)':d.temp_c<70?'var(--green)':d.temp_c<90?'var(--amber)':'var(--red)';
+    const cpuColor  = d.cpu_pct==null?'var(--green)':d.cpu_pct<70?'var(--green)':d.cpu_pct<90?'var(--amber)':'var(--red)';
+    const ramColor  = d.ram_pct==null?'var(--green)':d.ram_pct<70?'var(--green)':d.ram_pct<90?'var(--amber)':'var(--red)';
+    const diskColor = d.disk_pct==null?'var(--green)':d.disk_pct<70?'var(--green)':d.disk_pct<90?'var(--amber)':'var(--red)';
+    return `
+      <div class="sys-row"><span class="sys-label">CPU</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.cpu_pct??0}%;background:${cpuColor}"></div></div><span class="sys-val">${d.cpu_pct!=null?d.cpu_pct+'%':'—'}</span></div>
+      <div class="sys-row"><span class="sys-label">RAM</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.ram_pct??0}%;background:${ramColor}"></div></div><span class="sys-val">${d.ram_pct!=null?d.ram_pct+'%':'—'}</span></div>
+      <div class="sys-row"><span class="sys-label">TEMP</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.temp_c!=null?Math.min(d.temp_c,100):0}%;background:${tempColor}"></div></div><span class="sys-val">${d.temp_c!=null?d.temp_c+'°C':'—'}</span></div>
+      <div class="sys-row"><span class="sys-label">DISK</span><div class="sys-bar-wrap"><div class="sys-bar" style="width:${d.disk_pct??0}%;background:${diskColor}"></div></div><span class="sys-val">${d.disk_pct!=null?d.disk_pct+'%':'—'}</span></div>
+      <div class="since-row" style="margin-top:6px;">Uptime: ${d.uptime||'—'}</div>`;
+  }
+  return `<div class="since-row">${since}</div>`
+    +(d.last_error?`<div class="error-text">${d.last_error.replace(/camera/gi,'cam\u200Bera').replace(/tracker/gi,'trac\u200Bker').replace(/ads?[\s._-]/gi,m=>'a\u200B'+m.slice(1))}</div>`:'');
+}
+
+function buildRightContent(d){
+  if(d.type==='system' && d.uptime){
+    return `<div style="font-family:var(--mono);font-size:10.5px;color:var(--text-dim)"><div>Uptime</div><div style="font-weight:600;color:var(--text);margin-top:2px">${d.uptime}</div></div>`;
+  }
+  return `${latencyHtml(d.response_ms)}<div class="uptime-pct" id="uptime-pct-${d.id}">…</div>`;
+}
+
+function buildDockerHtml(d){
+  if(d.type!=='docker' || !d.containers || !d.containers.length) return '';
+  const items=d.containers.map(c=>{
+    const isRunning=c.state==='running';
+    return `<div class="docker-container-item">
+      <div class="docker-container-header" onclick="this.parentElement.classList.toggle('expanded')">
+        <div class="led ${isRunning?'on':'off'}" style="width:8px;height:8px;min-width:8px"></div>
+        <span style="font-size:12px;font-weight:500;">${c.name}</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-dim)">${c.status||c.state}</span>
+        <span class="collapse-btn" style="margin-left:6px">${ICONS.chevron}</span>
+      </div>
+      ${isRunning?`<div class="docker-container-body">
+        <div class="sys-row"><span class="sys-label" style="width:70px">CPU</span><span class="sys-val" style="width:auto;color:var(--text)">${c.cpu||'n/a'}</span></div>
+        <div class="sys-row"><span class="sys-label" style="width:70px">RAM</span><span class="sys-val" style="width:auto;color:var(--text)">${c.mem||'n/a'}</span></div>
+        <div class="sys-row"><span class="sys-label" style="width:70px">Red</span><span class="sys-val" style="width:auto;color:var(--text-dim)">${c.net||'n/a'}</span></div>
+      </div>`:''}
     </div>`;
   }).join('');
-  initInteractions();
-  ordered.forEach(d=>{loadUptime(d.id);loadLatency(d.id);if(d.type!=='system')loadHeartbeats(d.id);});
-  loadHaSensors();
+  return `<div class="docker-containers">${items}</div>`;
 }
 
 async function loadUptime(id){
@@ -684,6 +777,7 @@ async function loadUptime(id){
     const data=await(await fetch(`/api/uptime/${id}`)).json();
     const pct=data.uptime_pct;
     const col=pct>=99?'var(--green)':pct>=90?'var(--amber)':'var(--red)';
+    UPTIME_CACHE[id]={pct,col};
     const el=document.getElementById(`uptime-pct-${id}`);
     if(el){el.textContent='↑ '+pct+'%';el.style.color=col;}
   }catch{}
@@ -700,29 +794,35 @@ async function loadLatency(id){
   }catch{}
 }
 
-// Heartbeat bars (estilo Uptime Kuma · 3 círculos por check)
+// Heartbeat bars (estilo Uptime Kuma · 3 círculos por check) — en la cabecera
 async function loadHeartbeats(id){
   try{
     const data=await(await fetch(`/api/heartbeats/${id}`)).json();
-    const el=document.getElementById(`hb-${id}`);
-    if(!el||!data.points)return;
-    if(!data.points.length){
-      el.innerHTML='<span class="hb-label">Historial</span><span style="font-size:11px;color:var(--text-dim);align-self:center">Sin datos aún</span>';
-      return;
-    }
-    // orden ASC: izq = más antiguo, der = más reciente
-    const cols=data.points.map(p=>{
-      const st=p.state||(p.online?'up':'down');
-      const cls=['up','down','degraded','pending','maintenance'].includes(st)?st:(p.online?'up':'down');
-      const d=new Date(p.ts*1000);
-      const fecha=d.toLocaleDateString('es-ES',{day:'2-digit',month:'short'});
-      const hora=d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-      const lat=p.response_ms!=null?` · ${p.response_ms}ms`:'';
-      const lbl={up:'En línea',down:'Caído',degraded:'Degradado',pending:'Pendiente',maintenance:'Mantenimiento'}[cls];
-      return `<div class="hb-col ${cls}" title="${fecha} ${hora} · ${lbl}${lat}"><span class="hb-dot"></span><span class="hb-dot"></span><span class="hb-dot"></span></div>`;
-    }).join('');
-    el.innerHTML=`<span class="hb-label">Historial</span>${cols}`;
+    if(!data.points)return;
+    HB_CACHE[id]=data.points;
+    paintHeartbeats(id, data.points);
   }catch{}
+}
+
+function paintHeartbeats(id, points){
+  const el=document.getElementById(`hb-${id}`);
+  if(!el)return;
+  if(!points || !points.length){
+    el.innerHTML='<span class="hb-empty">sin datos</span>';
+    return;
+  }
+  // orden ASC: izq = más antiguo, der = más reciente
+  const cols=points.map(p=>{
+    const st=p.state||(p.online?'up':'down');
+    const cls=['up','down','degraded','pending','maintenance'].includes(st)?st:(p.online?'up':'down');
+    const d=new Date(p.ts*1000);
+    const fecha=d.toLocaleDateString('es-ES',{day:'2-digit',month:'short'});
+    const hora=d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    const lat=p.response_ms!=null?` · ${p.response_ms}ms`:'';
+    const lbl={up:'En línea',down:'Caído',degraded:'Degradado',pending:'Pendiente',maintenance:'Mantenimiento'}[cls];
+    return `<div class="hb-col ${cls}" title="${fecha} ${hora} · ${lbl}${lat}"><span class="hb-dot"></span><span class="hb-dot"></span><span class="hb-dot"></span></div>`;
+  }).join('');
+  el.innerHTML=cols;
 }
 </script>
 
@@ -839,41 +939,52 @@ async function toggleSwitch(id, checked){
 
 // Drag & Drop
 function initInteractions(){
-  const list=document.getElementById('device-list');
-  const rows=[...list.querySelectorAll('.device-row')];
-  let dragged=null;
-  rows.forEach(row=>{
-    row.querySelector('.device-header').addEventListener('click',e=>{
-      if(!e.target.closest('.drag-handle')&&!e.target.closest('.switch-row')&&!e.target.closest('.ios-toggle'))
-        toggleCollapsed(row.dataset.id);
-    });
-    row.addEventListener('dragstart',e=>{if(!e.target.closest('.drag-handle')&&e.target!==row){e.preventDefault();return;}dragged=row;setTimeout(()=>row.classList.add('dragging'),0);});
-    row.addEventListener('dragend',()=>{row.classList.remove('dragging');list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));persistOrder();});
-    row.addEventListener('dragover',e=>{e.preventDefault();if(row!==dragged){list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));row.classList.add('drag-over');}});
-    row.addEventListener('drop',e=>{e.preventDefault();if(row!==dragged){const all=[...list.querySelectorAll('.device-row')];all.indexOf(dragged)<all.indexOf(row)?row.after(dragged):row.before(dragged);}});
-  });
-  let td=null,tc=null,tOY=0;
-  rows.forEach(row=>{
-    row.querySelector('.drag-handle').addEventListener('touchstart',e=>{
-      td=row;const t=e.touches[0],r=row.getBoundingClientRect();tOY=t.clientY-r.top;
-      tc=row.cloneNode(true);Object.assign(tc.style,{position:'fixed',zIndex:1000,width:r.width+'px',left:r.left+'px',top:r.top+'px',opacity:.85,pointerEvents:'none',border:'1px solid var(--accent)',borderRadius:'22px',background:'var(--sheet)',transition:'none'});
-      document.body.appendChild(tc);row.classList.add('dragging');e.preventDefault();
-    },{passive:false});
-  });
-  document.addEventListener('touchmove',e=>{
-    if(!td||!tc)return;const t=e.touches[0];tc.style.top=(t.clientY-tOY)+'px';
-    tc.style.display='none';const el=document.elementFromPoint(t.clientX,t.clientY);tc.style.display='';
-    const tgt=el&&el.closest('.device-row');list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));
-    if(tgt&&tgt!==td)tgt.classList.add('drag-over');e.preventDefault();
-  },{passive:false});
-  document.addEventListener('touchend',e=>{
-    if(!td)return;const t=e.changedTouches[0];if(tc){tc.remove();tc=null;}td.classList.remove('dragging');
-    list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));
-    const el=document.elementFromPoint(t.clientX,t.clientY);const tgt=el&&el.closest('.device-row');
-    if(tgt&&tgt!==td){const all=[...list.querySelectorAll('.device-row')];all.indexOf(td)<all.indexOf(tgt)?tgt.after(td):tgt.before(td);}
-    persistOrder();td=null;
+  document.querySelectorAll('.device-row').forEach(row=>{
+    if(!row.dataset.intd){
+      row.dataset.intd='1';
+      initInteractionsFor(row);
+    }
   });
 }
+
+// Inicializa los listeners de una fila individual (click cabecera + drag desktop + drag touch).
+let _touchDragInit=false;
+function initInteractionsFor(row){
+  const list=document.getElementById('device-list');
+  row.querySelector('.device-header').addEventListener('click',e=>{
+    if(!e.target.closest('.drag-handle')&&!e.target.closest('.switch-row')&&!e.target.closest('.ios-toggle')&&!e.target.closest('.hb-header'))
+      toggleCollapsed(row.dataset.id);
+  });
+  row.addEventListener('dragstart',e=>{if(!e.target.closest('.drag-handle')&&e.target!==row){e.preventDefault();return;}_draggedRow=row;setTimeout(()=>row.classList.add('dragging'),0);});
+  row.addEventListener('dragend',()=>{row.classList.remove('dragging');list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));persistOrder();});
+  row.addEventListener('dragover',e=>{e.preventDefault();if(row!==_draggedRow){list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));row.classList.add('drag-over');}});
+  row.addEventListener('drop',e=>{e.preventDefault();if(row!==_draggedRow&&_draggedRow){const all=[...list.querySelectorAll('.device-row')];all.indexOf(_draggedRow)<all.indexOf(row)?row.after(_draggedRow):row.before(_draggedRow);}});
+
+  // Touch drag para esta fila (handler global solo se registra una vez)
+  row.querySelector('.drag-handle').addEventListener('touchstart',e=>{
+    _tdRow=row;const t=e.touches[0],r=row.getBoundingClientRect();_tdOffY=t.clientY-r.top;
+    _tdClone=row.cloneNode(true);Object.assign(_tdClone.style,{position:'fixed',zIndex:1000,width:r.width+'px',left:r.left+'px',top:r.top+'px',opacity:.85,pointerEvents:'none',border:'1px solid var(--accent)',borderRadius:'22px',background:'var(--sheet)',transition:'none'});
+    document.body.appendChild(_tdClone);row.classList.add('dragging');e.preventDefault();
+  },{passive:false});
+
+  if(!_touchDragInit){
+    _touchDragInit=true;
+    document.addEventListener('touchmove',e=>{
+      if(!_tdRow||!_tdClone)return;const t=e.touches[0];_tdClone.style.top=(t.clientY-_tdOffY)+'px';
+      _tdClone.style.display='none';const el=document.elementFromPoint(t.clientX,t.clientY);_tdClone.style.display='';
+      const tgt=el&&el.closest('.device-row');list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));
+      if(tgt&&tgt!==_tdRow)tgt.classList.add('drag-over');e.preventDefault();
+    },{passive:false});
+    document.addEventListener('touchend',e=>{
+      if(!_tdRow)return;const t=e.changedTouches[0];if(_tdClone){_tdClone.remove();_tdClone=null;}_tdRow.classList.remove('dragging');
+      list.querySelectorAll('.device-row').forEach(r=>r.classList.remove('drag-over'));
+      const el=document.elementFromPoint(t.clientX,t.clientY);const tgt=el&&el.closest('.device-row');
+      if(tgt&&tgt!==_tdRow){const all=[...list.querySelectorAll('.device-row')];all.indexOf(_tdRow)<all.indexOf(tgt)?tgt.after(_tdRow):tgt.before(_tdRow);}
+      persistOrder();_tdRow=null;
+    });
+  }
+}
+let _draggedRow=null,_tdRow=null,_tdClone=null,_tdOffY=0;
 function persistOrder(){saveOrder([...document.querySelectorAll('.device-row')].map(r=>r.dataset.id));}
 
 // Fetch
