@@ -246,6 +246,23 @@ def get_history(device_id: str, limit: int = 50) -> list[dict]:
             return [dict(row) for row in cur.fetchall()]
 
 
+def get_recent_heartbeats(device_id: str, limit: int = 45) -> list[dict]:
+    """Últimos N checks (los más recientes al final) para las barras tipo Uptime Kuma.
+    Cada item: {ts, online, state, response_ms}.
+    Se aprovecha de que status_history guarda un registro por cada check.
+    """
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT ts, online, state, response_ms FROM status_history "
+                "WHERE device_id = %s ORDER BY ts DESC LIMIT %s",
+                (device_id, limit),
+            )
+            rows = [dict(r) for r in cur.fetchall()]
+    # orden ASC: el más antiguo a la izquierda, el más reciente a la derecha
+    return list(reversed(rows))
+
+
 def get_latency_history(device_id: str, limit: int = 60) -> list[dict]:
     """Devuelve los ultimos N valores de latencia registrados."""
     with get_db() as conn:
