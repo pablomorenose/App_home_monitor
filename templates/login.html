@@ -83,8 +83,12 @@
   {% endif %}
   <form method="post">
     <div class="form-group">
+      <label>Usuario</label>
+      <input type="text" name="username" autofocus placeholder="admin" autocomplete="username">
+    </div>
+    <div class="form-group">
       <label>Contraseña</label>
-      <input type="password" name="password" autofocus placeholder="••••••••">
+      <input type="password" name="password" placeholder="••••••••" autocomplete="current-password">
     </div>
     <button type="submit" class="btn">Entrar</button>
   </form>

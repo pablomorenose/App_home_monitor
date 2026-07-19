@@ -35,6 +35,7 @@ logger = logging.getLogger("config")
 # ────────────────────────────────────────────────────────────────────
 SECRET_KEY = os.getenv("SECRET_KEY", "")
 ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD", "")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 
 # Si es true, permite arrancar sin ACCESS_PASSWORD (solo desarrollo)
 ALLOW_INSECURE_NO_AUTH = os.getenv("ALLOW_INSECURE_NO_AUTH", "false").lower() == "true"

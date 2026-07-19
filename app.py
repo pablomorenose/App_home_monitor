@@ -24,7 +24,7 @@ import time as _time
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for
 
 from config import (
-    SECRET_KEY, ACCESS_PASSWORD, VAPID_PUBLIC_KEY, APP_ENV, PUSH_ENABLED,
+    SECRET_KEY, ACCESS_PASSWORD, ADMIN_USERNAME, VAPID_PUBLIC_KEY, APP_ENV, PUSH_ENABLED,
     DOCKER_METRICS_ENABLED, STATUS_PAGE_ENABLED, APP_VERSION, validate_config,
 )
 from csrf import get_csrf_token, csrf_protect
@@ -133,12 +133,12 @@ def login():
     if request.method == "POST":
         if not _check_login_rate(request.remote_addr):
             return render_template("login.html", error="Demasiados intentos. Espera 5 minutos."), 429
-        if request.form.get("password") == ACCESS_PASSWORD:
+        if request.form.get("username") == ADMIN_USERNAME and request.form.get("password") == ACCESS_PASSWORD:
             session.clear()
             session["authenticated"] = True
             get_csrf_token()  # regenerate CSRF token on login
             return redirect(url_for("index"))
-        error = "Contraseña incorrecta"
+        error = "Usuario o contraseña incorrectos"
     return render_template("login.html", error=error)
 
 

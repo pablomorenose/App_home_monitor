@@ -20,6 +20,7 @@ services:
       - APP_ENV=${APP_ENV:-production}
       - SECRET_KEY=${SECRET_KEY}
       - ACCESS_PASSWORD=${ACCESS_PASSWORD}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - CHECK_INTERVAL_SECONDS=${CHECK_INTERVAL_SECONDS:-15}
       - DB_HOST=${DB_HOST}
       - DB_NAME=${DB_NAME:-postgres}
