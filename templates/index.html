@@ -751,12 +751,29 @@ function buildRightContent(d){
   return `${latencyHtml(d.response_ms)}<div class="uptime-pct" id="uptime-pct-${d.id}">…</div>`;
 }
 
+// Estado "expandido" de los contenedores docker (persiste entre renders).
+// Se guarda por nombre de contenedor en localStorage para sobrevivir a refresh.
+const DOCKER_EXPANDED_KEY='homem_docker_expanded';
+function loadDockerExpanded(){try{return new Set(JSON.parse(localStorage.getItem(DOCKER_EXPANDED_KEY))||[]);}catch{return new Set();}}
+function saveDockerExpanded(set){try{localStorage.setItem(DOCKER_EXPANDED_KEY,JSON.stringify([...set]));}catch{}}
+function toggleDockerContainer(name){
+  const set=loadDockerExpanded();
+  if(set.has(name)) set.delete(name); else set.add(name);
+  saveDockerExpanded(set);
+  // aplicar visualmente sin esperar al próximo refresh
+  const item=document.querySelector(`.docker-container-item[data-name="${cssEscape(name)}"]`);
+  if(item) item.classList.toggle('expanded');
+}
+function cssEscape(s){return String(s).replace(/["\\]/g,'\\$&');}
+
 function buildDockerHtml(d){
   if(d.type!=='docker' || !d.containers || !d.containers.length) return '';
+  const expanded=loadDockerExpanded();
   const items=d.containers.map(c=>{
     const isRunning=c.state==='running';
-    return `<div class="docker-container-item">
-      <div class="docker-container-header" onclick="this.parentElement.classList.toggle('expanded')">
+    const isOpen=expanded.has(c.name);
+    return `<div class="docker-container-item${isOpen?' expanded':''}" data-name="${cssEscape(c.name)}">
+      <div class="docker-container-header" onclick="toggleDockerContainer(${JSON.stringify(c.name)})">
         <div class="led ${isRunning?'on':'off'}" style="width:8px;height:8px;min-width:8px"></div>
         <span style="font-size:12px;font-weight:500;">${c.name}</span>
         <span style="margin-left:auto;font-size:11px;color:var(--text-dim)">${c.status||c.state}</span>
