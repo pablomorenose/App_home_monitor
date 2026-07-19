@@ -178,7 +178,7 @@
   .ios-toggle input:checked + .ios-toggle-track:before{transform:translateX(20px);}
 
   /* ── Cuerpo expandible ── */
-  .device-body{overflow:hidden;max-height:500px;transition:max-height .3s ease,padding .3s;}
+  .device-body{overflow:hidden;max-height:2000px;transition:max-height .3s ease,padding .3s;}
   .device-row.collapsed .device-body{max-height:0;}
   .device-body-inner{padding:0 17px;transition:padding .3s;}
   .device-row.collapsed .device-body-inner{padding-top:0;padding-bottom:0;}
@@ -585,7 +585,7 @@ function renderDevices(devices){
           </div>`:''}
         </div>`;
       }).join('');
-      dockerMetricsHtml = `<div class="docker-containers" style="max-height:300px;overflow-y:auto;">${items}</div>`;
+      dockerMetricsHtml = `<div class="docker-containers">${items}</div>`;
     }
 
     // Fila PROTECCIÓN para ha_switch (dentro del body desplegable)
