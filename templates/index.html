@@ -756,15 +756,17 @@ function buildRightContent(d){
 const DOCKER_EXPANDED_KEY='homem_docker_expanded';
 function loadDockerExpanded(){try{return new Set(JSON.parse(localStorage.getItem(DOCKER_EXPANDED_KEY))||[]);}catch{return new Set();}}
 function saveDockerExpanded(set){try{localStorage.setItem(DOCKER_EXPANDED_KEY,JSON.stringify([...set]));}catch{}}
-function toggleDockerContainer(name){
+// Lee el nombre del data-name del propio elemento (evita interpolar strings en onclick)
+function toggleDockerContainerFromHeader(headerEl){
+  const item=headerEl.closest('.docker-container-item');
+  if(!item||!item.dataset.name)return;
+  const name=item.dataset.name;
   const set=loadDockerExpanded();
-  if(set.has(name)) set.delete(name); else set.add(name);
+  const willOpen=!set.has(name);
+  if(willOpen) set.add(name); else set.delete(name);
   saveDockerExpanded(set);
-  // aplicar visualmente sin esperar al próximo refresh
-  const item=document.querySelector(`.docker-container-item[data-name="${cssEscape(name)}"]`);
-  if(item) item.classList.toggle('expanded');
+  item.classList.toggle('expanded', willOpen);
 }
-function cssEscape(s){return String(s).replace(/["\\]/g,'\\$&');}
 
 function buildDockerHtml(d){
   if(d.type!=='docker' || !d.containers || !d.containers.length) return '';
@@ -772,22 +774,23 @@ function buildDockerHtml(d){
   const items=d.containers.map(c=>{
     const isRunning=c.state==='running';
     const isOpen=expanded.has(c.name);
-    return `<div class="docker-container-item${isOpen?' expanded':''}" data-name="${cssEscape(c.name)}">
-      <div class="docker-container-header" onclick="toggleDockerContainer(${JSON.stringify(c.name)})">
+    return `<div class="docker-container-item${isOpen?' expanded':''}" data-name="${escAttr(c.name)}">
+      <div class="docker-container-header" onclick="toggleDockerContainerFromHeader(this)">
         <div class="led ${isRunning?'on':'off'}" style="width:8px;height:8px;min-width:8px"></div>
-        <span style="font-size:12px;font-weight:500;">${c.name}</span>
-        <span style="margin-left:auto;font-size:11px;color:var(--text-dim)">${c.status||c.state}</span>
+        <span style="font-size:12px;font-weight:500;">${escAttr(c.name)}</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-dim)">${escAttr(c.status||c.state||'')}</span>
         <span class="collapse-btn" style="margin-left:6px">${ICONS.chevron}</span>
       </div>
       ${isRunning?`<div class="docker-container-body">
-        <div class="sys-row"><span class="sys-label" style="width:70px">CPU</span><span class="sys-val" style="width:auto;color:var(--text)">${c.cpu||'n/a'}</span></div>
-        <div class="sys-row"><span class="sys-label" style="width:70px">RAM</span><span class="sys-val" style="width:auto;color:var(--text)">${c.mem||'n/a'}</span></div>
-        <div class="sys-row"><span class="sys-label" style="width:70px">Red</span><span class="sys-val" style="width:auto;color:var(--text-dim)">${c.net||'n/a'}</span></div>
+        <div class="sys-row"><span class="sys-label" style="width:70px">CPU</span><span class="sys-val" style="width:auto;color:var(--text)">${escAttr(c.cpu||'n/a')}</span></div>
+        <div class="sys-row"><span class="sys-label" style="width:70px">RAM</span><span class="sys-val" style="width:auto;color:var(--text)">${escAttr(c.mem||'n/a')}</span></div>
+        <div class="sys-row"><span class="sys-label" style="width:70px">Red</span><span class="sys-val" style="width:auto;color:var(--text-dim)">${escAttr(c.net||'n/a')}</span></div>
       </div>`:''}
     </div>`;
   }).join('');
   return `<div class="docker-containers">${items}</div>`;
 }
+function escAttr(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 async function loadUptime(id){
   try{
