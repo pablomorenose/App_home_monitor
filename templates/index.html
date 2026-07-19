@@ -613,7 +613,7 @@ function createRow(d, collapsedPref){
   const rc=(d.online?'':'is-down')+(isCollapsed?' collapsed':'')+(protectionOff?' protection-off':'');
   const maintBadge=d.in_maintenance?`<span class="badge-maint">Mant.</span>`:'';
   const haSensors=d.id==='home_assistant'?`<div id="ha-sensors" class="ha-sensors"></div>`:'';
-  const extraSensors=(d.id==='adguard')?`<div id="adguard-sensors" class="ha-sensors"></div>`:'`;
+  const extraSensors=(d.id==='adguard')?`<div id="adguard-sensors" class="ha-sensors"></div>`:'';
 
   const row=document.createElement('div');
   row.className=`device-row ${rc}`;
