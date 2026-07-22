@@ -47,7 +47,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=False,  # Allow HTTP (LAN) + HTTPS (Tailscale Funnel)
-    PERMANENT_SESSION_LIFETIME=86400,  # 24h
+    PERMANENT_SESSION_LIFETIME=30 * 24 * 3600,  # 30 days
 )
 
 
@@ -135,6 +135,7 @@ def login():
             return render_template("login.html", error="Demasiados intentos. Espera 5 minutos."), 429
         if request.form.get("username") == ADMIN_USERNAME and request.form.get("password") == ACCESS_PASSWORD:
             session.clear()
+            session.permanent = True
             session["authenticated"] = True
             get_csrf_token()  # regenerate CSRF token on login
             return redirect(url_for("index"))
