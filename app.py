@@ -641,7 +641,7 @@ def api_latency(device_id):
 def api_heartbeats(device_id):
     """Últimos checks para las barras tipo Uptime Kuma (orden ASC)."""
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
-    beats = get_recent_heartbeats(device_id, limit=45)
+    beats = get_recent_heartbeats(device_id, limit=90)
     return jsonify({
         "points": [
             {
