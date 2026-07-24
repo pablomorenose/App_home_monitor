@@ -26,3 +26,4 @@ venv/
 
 # Scripts temporales
 gen_vapid.py
+.zcode/
