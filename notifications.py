@@ -8,6 +8,7 @@ siguen siendo necesarias y se usan desde alerts.py y app.py.
 """
 
 import json
+import os
 import time
 from contextlib import contextmanager
 
@@ -23,7 +24,8 @@ from config import VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VAPID_CLAIMS_EMAIL
 def get_db():
     conn = psycopg2.connect(
         host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
-        user=DB_USER, password=DB_PASSWORD, sslmode="require",
+        user=DB_USER, password=DB_PASSWORD,
+        sslmode=os.getenv("DB_SSLMODE", "require"),
     )
     conn.autocommit = False
     try:

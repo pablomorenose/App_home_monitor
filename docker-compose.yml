@@ -1,8 +1,29 @@
 services:
+  home-monitor-db:
+    image: postgres:16-alpine
+    container_name: home-monitor-db
+    restart: unless-stopped
+    volumes:
+      - home-monitor-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME:-postgres}
+      - TZ=${TZ:-Europe/Madrid}
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   home-monitor:
     build: .
     container_name: home-monitor
     restart: unless-stopped
+    depends_on:
+      home-monitor-db:
+        condition: service_healthy
     ports:
       - "0.0.0.0:8088:8088"
     volumes:
@@ -22,11 +43,12 @@ services:
       - ACCESS_PASSWORD=${ACCESS_PASSWORD}
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - CHECK_INTERVAL_SECONDS=${CHECK_INTERVAL_SECONDS:-15}
-      - DB_HOST=${DB_HOST}
+      - DB_HOST=home-monitor-db
       - DB_NAME=${DB_NAME:-postgres}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_PORT=${DB_PORT:-5432}
       - DB_USER=${DB_USER:-postgres}
+      - DB_SSLMODE=disable
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN:-}
       - HOME_ASSISTANT_URL=${HOME_ASSISTANT_URL:-}
       - VAPID_CLAIMS_EMAIL=${VAPID_CLAIMS_EMAIL:-}
@@ -35,3 +57,6 @@ services:
       - DOCKER_METRICS_ENABLED=${DOCKER_METRICS_ENABLED:-true}
       - TZ=${TZ:-Europe/Madrid}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+volumes:
+  home-monitor-db-data:

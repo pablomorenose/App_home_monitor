@@ -20,7 +20,8 @@ from config import DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
 def get_db():
     conn = psycopg2.connect(
         host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
-        user=DB_USER, password=DB_PASSWORD, sslmode="require",
+        user=DB_USER, password=DB_PASSWORD,
+        sslmode=os.getenv("DB_SSLMODE", "require"),
     )
     conn.autocommit = False
     try:
