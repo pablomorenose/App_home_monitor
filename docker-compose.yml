@@ -46,7 +46,7 @@ services:
       - DB_HOST=home-monitor-db
       - DB_NAME=${DB_NAME:-postgres}
       - DB_PASSWORD=${DB_PASSWORD}
-      - DB_PORT=${DB_PORT:-5432}
+      - DB_PORT=5432
       - DB_USER=${DB_USER:-postgres}
       - DB_SSLMODE=disable
       - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN:-}
