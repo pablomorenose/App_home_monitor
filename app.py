@@ -639,12 +639,12 @@ def api_latency(device_id):
 
 @app.route("/api/heartbeats/<device_id>")
 def api_heartbeats(device_id):
-    """Historial 24h agrupado en buckets de 15 min (estilo Uptime Kuma).
-    Devuelve siempre 96 buckets; los vacíos salen como 'unknown' (gris)."""
+    """Historial 12h agrupado en buckets de 15 min (estilo Uptime Kuma).
+    Devuelve siempre 48 buckets; los vacíos salen como 'unknown' (gris)."""
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
-    buckets = get_heartbeat_buckets(device_id, hours=24, bucket_minutes=15)
+    buckets = get_heartbeat_buckets(device_id, hours=12, bucket_minutes=15)
     return jsonify({
-        "hours": 24,
+        "hours": 12,
         "bucket_minutes": 15,
         "points": [
             {"start": bk["start"], "end": bk["end"], "state": bk["state"], "n": bk["n"]}
