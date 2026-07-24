@@ -263,6 +263,74 @@ def get_recent_heartbeats(device_id: str, limit: int = 45) -> list[dict]:
     return list(reversed(rows))
 
 
+# Pesos para decidir el estado de un bucket por prioridad (más bajo = gana).
+_BUCKET_STATE_WEIGHT = {"down": 0, "degraded": 1, "pending": 2, "maintenance": 3, "up": 4}
+
+
+def _bucket_state(online: int, state):
+    """Estado efectivo de un check individual: prioriza 'state' si es informativo."""
+    s = (state or "").strip().lower()
+    if s in _BUCKET_STATE_WEIGHT:
+        return s
+    return "up" if online else "down"
+
+
+def get_heartbeat_buckets(device_id: str, hours: int = 24, bucket_minutes: int = 15) -> list[dict]:
+    """Historial de las últimas `hours` horas agrupado en buckets de `bucket_minutes`,
+    al estilo Uptime Kuma. Devuelve SIEMPRE `hours*60/bucket_minutes` buckets
+    (incluidos los vacíos antes de que existiera el monitor), ordenados ASC.
+
+    Cada bucket: {start, end, state, n}
+      state ∈ {up, down, degraded, pending, maintenance, unknown}
+        - unknown: no hay checks en ese intervalo (monitor aún no existía)
+        - el resto: el PEOR estado que tuvo el dispositivo durante el bucket
+          (una caída de 1 check ya tinta el bucket de rojo, como Uptime Kuma)
+      n: nº de checks en el bucket
+    """
+    now = time.time()
+    span = hours * 3600
+    since = now - span
+    bucket_secs = bucket_minutes * 60
+    n_buckets = span // bucket_secs
+
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Agrupar en el propio SQL: nº de bucket desde 'since' (0 = más antiguo).
+            cur.execute(
+                "SELECT online, state, ts, "
+                "FLOOR((ts - %s) / %s)::int AS b "
+                "FROM status_history "
+                "WHERE device_id = %s AND ts >= %s",
+                (since, bucket_secs, device_id, since),
+            )
+            raw = [dict(r) for r in cur.fetchall()]
+
+    # Acumular, por bucket, el peor estado y el nº de checks.
+    worst = {}  # b -> estado
+    counts = {}  # b -> n
+    for r in raw:
+        b = r["b"]
+        if b < 0 or b >= n_buckets:
+            continue
+        st = _bucket_state(int(r["online"]), r.get("state"))
+        if b not in worst or _BUCKET_STATE_WEIGHT[st] < _BUCKET_STATE_WEIGHT[worst[b]]:
+            worst[b] = st
+        counts[b] = counts.get(b, 0) + 1
+
+    # Construir los n_buckets completos (los vacíos salen 'unknown').
+    buckets = []
+    for b in range(n_buckets):
+        start = since + b * bucket_secs
+        end = start + bucket_secs
+        buckets.append({
+            "start": start,
+            "end": end,
+            "state": worst.get(b, "unknown"),
+            "n": counts.get(b, 0),
+        })
+    return buckets
+
+
 def get_latency_history(device_id: str, limit: int = 60) -> list[dict]:
     """Devuelve los ultimos N valores de latencia registrados."""
     with get_db() as conn:

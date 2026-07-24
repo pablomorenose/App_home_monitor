@@ -33,7 +33,7 @@ from db import (delete_device, get_all_devices, get_all_statuses, get_history,
                 get_incidents, get_all_monitors, get_monitor, upsert_monitor,
                 get_monitor_statuses, update_heartbeat_ts,
                 get_uptime_percentage, get_avg_latency, get_incidents_for_monitor,
-                get_history_timeseries, get_recent_heartbeats)
+                get_history_timeseries, get_recent_heartbeats, get_heartbeat_buckets)
 from monitor_worker import run_checks_once, start_background_monitor
 from notifications import delete_subscription, init_push_table, save_subscription
 from validators import validate_monitor
@@ -639,19 +639,17 @@ def api_latency(device_id):
 
 @app.route("/api/heartbeats/<device_id>")
 def api_heartbeats(device_id):
-    """Últimos checks para las barras tipo Uptime Kuma (orden ASC)."""
+    """Historial 24h agrupado en buckets de 15 min (estilo Uptime Kuma).
+    Devuelve siempre 96 buckets; los vacíos salen como 'unknown' (gris)."""
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
-    beats = get_recent_heartbeats(device_id, limit=90)
+    buckets = get_heartbeat_buckets(device_id, hours=24, bucket_minutes=15)
     return jsonify({
+        "hours": 24,
+        "bucket_minutes": 15,
         "points": [
-            {
-                "ts": b["ts"],
-                "online": bool(b["online"]),
-                "state": b.get("state"),
-                "response_ms": b.get("response_ms"),
-            }
-            for b in beats
-        ]
+            {"start": bk["start"], "end": bk["end"], "state": bk["state"], "n": bk["n"]}
+            for bk in buckets
+        ],
     })
 
 

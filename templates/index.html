@@ -215,13 +215,15 @@
 
   /* ── Heartbeat en cabecera (3 círculos por check · estilo Uptime Kuma) ── */
   .hb-header{
-    display:flex;align-items:center;gap:3px;flex-shrink:0;
-    min-width:0;overflow:hidden;max-width:min(42vw, 220px);
-    margin-left:auto;padding:0 2px;
+    display:flex;align-items:center;gap:2px;flex-shrink:0;
+    min-width:0;overflow-x:auto;overflow-y:hidden;
+    max-width:min(48vw, 260px);scrollbar-width:none;
+    margin-left:auto;padding:1px 2px;-webkit-overflow-scrolling:touch;
   }
+  .hb-header::-webkit-scrollbar{display:none;}
   .hb-col{
-    display:flex;flex-direction:column;gap:2px;align-items:center;
-    flex-shrink:0;padding:1px;cursor:default;transition:transform .12s;
+    display:flex;flex-direction:column;gap:1px;align-items:center;
+    flex-shrink:0;padding:0;cursor:default;transition:transform .12s;
   }
   .hb-col:hover{transform:translateY(-1px);}
   .hb-col:hover .hb-dot{filter:brightness(1.35);}
@@ -230,6 +232,7 @@
   .hb-col.down .hb-dot{background:var(--red);}
   .hb-col.degraded .hb-dot{background:var(--amber);}
   .hb-col.pending .hb-dot,.hb-col.maintenance .hb-dot{background:var(--text-tertiary);opacity:.4;}
+  .hb-col.unknown .hb-dot{background:var(--text-tertiary);opacity:.12;}
   .hb-empty{font-size:10px;color:var(--text-tertiary);font-style:italic;}
 
   /* ── Uptime (solo texto, sin barra) ── */
@@ -831,16 +834,16 @@ function paintHeartbeats(id, points){
     el.innerHTML='<span class="hb-empty">sin datos</span>';
     return;
   }
-  // orden ASC: izq = más antiguo, der = más reciente
+  // points = buckets de 15 min (ASC). Cada uno: {start, end, state, n}
+  const LBL={up:'En línea',down:'Caído',degraded:'Degradado',pending:'Pendiente',maintenance:'Mantenimiento',unknown:'Sin datos'};
   const cols=points.map(p=>{
-    const st=p.state||(p.online?'up':'down');
-    const cls=['up','down','degraded','pending','maintenance'].includes(st)?st:(p.online?'up':'down');
-    const d=new Date(p.ts*1000);
-    const fecha=d.toLocaleDateString('es-ES',{day:'2-digit',month:'short'});
-    const hora=d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-    const lat=p.response_ms!=null?` · ${p.response_ms}ms`:'';
-    const lbl={up:'En línea',down:'Caído',degraded:'Degradado',pending:'Pendiente',maintenance:'Mantenimiento'}[cls];
-    return `<div class="hb-col ${cls}" title="${fecha} ${hora} · ${lbl}${lat}"><span class="hb-dot"></span><span class="hb-dot"></span><span class="hb-dot"></span></div>`;
+    const cls=p.state||'unknown';
+    const d0=new Date(p.start*1000), d1=new Date(p.end*1000);
+    const f=d0.toLocaleDateString('es-ES',{day:'2-digit',month:'short'});
+    const h0=d0.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    const h1=d1.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    const nfo=cls==='unknown'?'':` · ${p.n} checks`;
+    return `<div class="hb-col ${cls}" title="${f} ${h0}–${h1} · ${LBL[cls]||cls}${nfo}"><span class="hb-dot"></span><span class="hb-dot"></span><span class="hb-dot"></span></div>`;
   }).join('');
   el.innerHTML=cols;
 }
