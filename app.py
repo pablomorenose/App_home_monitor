@@ -579,10 +579,10 @@ def api_status():
         # Include remote system metrics inline for 'remote_system' type monitors
         if cfg.get("type") == "remote_system":
             try:
-                url = cfg.get("config_json", {}).get("url", "") if isinstance(cfg.get("config_json"), dict) else ""
+                url = cfg.get("url", "")
                 if not url:
                     import json as _json
-                    url = _json.loads(cfg.get("config_json", "{}")).get("url", "")
+                    url = _json.loads(cfg.get("config_json") or "{}").get("url", "")
                 if url:
                     entry.update(_get_cached_remote_system_metrics(
                         device_id=cfg["id"],
