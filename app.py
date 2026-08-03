@@ -758,6 +758,33 @@ def remove_device(device_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/devices/<device_id>/poweroff", methods=["POST"])
+@csrf_protect
+def poweroff_device(device_id):
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    devices = {d["id"]: d for d in get_all_devices()}
+    device = devices.get(device_id)
+    if not device:
+        return jsonify({"error": "Dispositivo no encontrado"}), 404
+    if device.get("type") != "remote_system":
+        return jsonify({"error": "Solo se puede apagar dispositivos de tipo remote_system"}), 400
+    url = device.get("url", "")
+    if not url:
+        return jsonify({"error": "URL del agente no configurada"}), 400
+    # Extraer host del agente
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    agent_base = f"{parsed.scheme}://{parsed.netloc}"
+    try:
+        import requests as _requests
+        resp = _requests.post(f"{agent_base}/poweroff", timeout=5)
+        if resp.status_code == 200:
+            return jsonify({"ok": True})
+        return jsonify({"error": f"El agente respondió {resp.status_code}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # -----------------------------------------------------------------------
 # API de Monitores (Phase 2 — campos extendidos)
 # -----------------------------------------------------------------------
