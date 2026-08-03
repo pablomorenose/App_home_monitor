@@ -389,6 +389,7 @@
         <option value="docker">Docker — Contenedor</option>
         <option value="heartbeat">Heartbeat — Señal periódica</option>
         <option value="system">System — Host metrics</option>
+        <option value="remote_system">Remote System — métricas via agente HTTP</option>
       </select>
     </div>
     <div id="fields-http"><div class="fg"><label>URL</label><input type="text" id="f-url" placeholder="https://..."></div></div>
@@ -642,7 +643,7 @@ function createRow(d, collapsedPref){
           <div class="device-left-slot"></div>
           ${haSensors}
           ${extraSensors}
-          ${d.type!=='system'?sparklineHtml(d.id):''}
+          ${(d.type!=='system'&&d.type!=='remote_system')?sparklineHtml(d.id):''}
         </div>
         <div class="device-right"></div>
       </div>
@@ -731,7 +732,7 @@ function buildSwitchRow(d){
 
 function buildLeftContent(d){
   const since=d.online?`${d.since_human} en línea`:`caído hace ${d.since_human}`;
-  if(d.type==='system' && d.cpu_pct!=null){
+  if((d.type==='system'||d.type==='remote_system') && d.cpu_pct!=null){
     const tempColor = d.temp_c==null?'var(--green)':d.temp_c<70?'var(--green)':d.temp_c<90?'var(--amber)':'var(--red)';
     const cpuColor  = d.cpu_pct==null?'var(--green)':d.cpu_pct<70?'var(--green)':d.cpu_pct<90?'var(--amber)':'var(--red)';
     const ramColor  = d.ram_pct==null?'var(--green)':d.ram_pct<70?'var(--green)':d.ram_pct<90?'var(--amber)':'var(--red)';
@@ -748,7 +749,7 @@ function buildLeftContent(d){
 }
 
 function buildRightContent(d){
-  if(d.type==='system' && d.uptime){
+  if((d.type==='system'||d.type==='remote_system') && d.uptime){
     return `<div style="font-family:var(--mono);font-size:10.5px;color:var(--text-dim)"><div>Uptime</div><div style="font-weight:600;color:var(--text);margin-top:2px">${d.uptime}</div></div>`;
   }
   return `${latencyHtml(d.response_ms)}<div class="uptime-pct" id="uptime-pct-${d.id}">…</div>`;

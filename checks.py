@@ -710,6 +710,75 @@ def check_system(timeout: int = 5) -> dict:
 
 
 # ───────────────────────────────────────────────────────────────────
+# Remote System Check (via metrics_agent HTTP endpoint)
+# ───────────────────────────────────────────────────────────────────
+
+def check_remote_system(url: str, timeout: int = 8,
+                        cpu_warn: int = 95, ram_warn: int = 95,
+                        disk_warn: int = 95, temp_warn: int = 80) -> dict:
+    """
+    Check a remote machine's system metrics via the metrics_agent HTTP endpoint.
+    Expects JSON response with: cpu_pct, ram_pct, temp_c, disk_pct, uptime, etc.
+    Returns the same normalized format as check_system().
+    """
+    try:
+        start = time.monotonic()
+        resp = requests.get(url, timeout=timeout)
+        ms = round((time.monotonic() - start) * 1000)
+    except requests.exceptions.ConnectTimeout:
+        return _make_result("down", "Sin respuesta (timeout)")
+    except requests.exceptions.ConnectionError:
+        return _make_result("down", "Conexión rechazada")
+    except requests.exceptions.RequestException as e:
+        return _make_result("down", type(e).__name__)
+
+    if resp.status_code != 200:
+        return _make_result("down", f"HTTP {resp.status_code}", latency_ms=ms)
+
+    try:
+        data = resp.json()
+    except Exception:
+        return _make_result("down", "Respuesta no es JSON válido", latency_ms=ms)
+
+    cpu_pct    = data.get("cpu_pct")
+    ram_pct    = data.get("ram_pct")
+    temp_c     = data.get("temp_c")
+    disk_pct   = data.get("disk_pct")
+    uptime     = data.get("uptime")
+
+    # Determine state
+    state = "up"
+    message = "System OK"
+    if cpu_pct is not None and cpu_pct > cpu_warn:
+        state = "degraded"
+        message = f"CPU alta: {cpu_pct}%"
+    elif ram_pct is not None and ram_pct > ram_warn:
+        state = "degraded"
+        message = f"RAM alta: {ram_pct}%"
+    elif disk_pct is not None and disk_pct > disk_warn:
+        state = "degraded"
+        message = f"Disco lleno: {disk_pct}%"
+    elif temp_c is not None and temp_c > temp_warn:
+        state = "degraded"
+        message = f"Temperatura alta: {temp_c}°C"
+
+    return _make_result(
+        state, message, latency_ms=ms,
+        cpu_pct=cpu_pct,
+        ram_pct=ram_pct,
+        ram_total_mb=data.get("ram_total_mb"),
+        ram_used_mb=data.get("ram_used_mb"),
+        ram_avail_mb=data.get("ram_avail_mb"),
+        temp_c=temp_c,
+        disk_pct=disk_pct,
+        disk_total_gb=data.get("disk_total_gb"),
+        disk_used_gb=data.get("disk_used_gb"),
+        disk_free_gb=data.get("disk_free_gb"),
+        uptime=uptime,
+    )
+
+
+# ───────────────────────────────────────────────────────────────────
 # Dispatcher
 # ───────────────────────────────────────────────────────────────────
 
@@ -784,6 +853,16 @@ def check_monitor(monitor: dict) -> dict:
 
     if mtype == "system":
         return check_system(timeout=timeout)
+
+    if mtype == "remote_system":
+        return check_remote_system(
+            url=monitor.get("url", ""),
+            timeout=timeout,
+            cpu_warn=int(monitor.get("cpu_warn", 95)),
+            ram_warn=int(monitor.get("ram_warn", 95)),
+            disk_warn=int(monitor.get("disk_warn", 95)),
+            temp_warn=int(monitor.get("temp_warn", 80)),
+        )
 
     if mtype == "heartbeat":
         return check_heartbeat(
