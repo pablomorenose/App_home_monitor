@@ -29,6 +29,10 @@ USER appuser
 EXPOSE 8088
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD curl -f http://localhost:8088/login || exit 1
+    CMD curl -f http://localhost:8088/health || exit 1
 
-CMD ["python", "app.py"]
+# Un único worker a propósito: el hilo de monitorización corre dentro del
+# proceso. La concurrencia se saca de los threads.
+CMD ["gunicorn", "--workers", "1", "--threads", "8", \
+     "--bind", "0.0.0.0:8088", "--access-logfile", "-", \
+     "--timeout", "60", "wsgi:app"]

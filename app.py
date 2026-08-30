@@ -1260,10 +1260,21 @@ def health_check():
 # Arranque
 # -----------------------------------------------------------------------
 
-if __name__ == "__main__":
+def bootstrap():
+    """Inicialización única del proceso: esquema, seed y monitor de fondo.
+
+    La llama wsgi.py (gunicorn en producción) y el __main__ de abajo (dev).
+    No fuerza un ciclo inicial: start_background_monitor() ya comprueba de
+    inmediato todos los monitores que tengan el intervalo vencido, que al
+    arrancar son todos.
+    """
     init_db()
     init_push_table()
     seed_devices_from_config()
-    run_monitor_cycle(force=True)
     start_background_monitor()
+
+
+if __name__ == "__main__":
+    # Solo para desarrollo. En producción se sirve con gunicorn (ver Dockerfile).
+    bootstrap()
     app.run(host="0.0.0.0", port=8088, debug=False)

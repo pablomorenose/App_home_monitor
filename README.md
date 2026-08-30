@@ -80,6 +80,16 @@ docker compose up -d
 
 5. Access at `http://localhost:8088`
 
+The container serves the app with gunicorn. Run it with **one worker** only —
+the monitoring loop is a thread inside the process, so extra workers would each
+run their own copy of it. Scale with `--threads`, not `--workers`.
+
+For local development you can still use the Flask dev server:
+
+```bash
+python3 app.py
+```
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |
@@ -177,6 +187,7 @@ docker compose up -d
             └─────────────┘
 ```
 
+- **wsgi.py** — WSGI entrypoint used by gunicorn; runs the one-time bootstrap
 - **app.py** — Flask web server, REST API, authentication, security headers
 - **monitor_worker.py** — Background thread running checks at configured intervals
 - **checks.py** — Check implementations (HTTP, Ping, Port, DNS, TLS, HA, Docker, Heartbeat)

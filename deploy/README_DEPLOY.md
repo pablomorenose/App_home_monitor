@@ -24,7 +24,7 @@ Sigue los pasos en orden. Se hace una sola vez; luego todo es automático.
 ## Paso 0. Antes de empezar
 
 Asegúrate de que ya tienes funcionando el monitor en local, como en la guía
-del README principal (`python3 app.py` y accesible en tu red interna). Si
+del README principal (servida con gunicorn y accesible en tu red interna). Si
 aún no lo has probado así, hazlo primero — es mucho más fácil depurar
 problemas de red/IPs antes de meter Nginx y certificados en la ecuación.
 
