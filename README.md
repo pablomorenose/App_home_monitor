@@ -187,7 +187,8 @@ python3 app.py
 ```
 
 - **wsgi.py** — WSGI entrypoint used by gunicorn; runs the one-time bootstrap
-- **app.py** — Flask web server, REST API, authentication, security headers
+- **app.py** — App assembly: config, blueprint registration, security headers, bootstrap
+- **routes/** — The views, one blueprint per area: `auth`, `pages`, `devices`, `monitors`, `stats`, `push`
 - **monitor_worker.py** — Background thread running checks at configured intervals
 - **checks.py** — Check implementations (HTTP, Ping, Port, DNS, TLS, HA, Docker, Heartbeat)
 - **state_machine.py** — State transitions with retries and recovery thresholds

@@ -98,6 +98,21 @@ def test_los_endpoints_privados_responden_401_sin_sesion(client):
             assert resp.get_json()["error"] == "No autorizado"
 
 
+def test_las_paginas_se_renderizan_con_sesion(client):
+    """Comprueba que las plantillas y los estáticos siguen resolviéndose."""
+    with client.session_transaction() as sess:
+        sess["authenticated"] = True
+    html = client.get("/").get_data(as_text=True)
+    assert "/static/css/dashboard.css" in html
+    assert "/static/js/dashboard.js" in html
+    assert client.get("/historial").status_code == 200
+
+
+def test_el_login_se_renderiza_con_token_csrf(client):
+    html = client.get("/login").get_data(as_text=True)
+    assert 'name="csrf_token"' in html
+
+
 def test_el_login_rechaza_un_post_sin_token_csrf(client):
     resp = client.post("/login", data={"username": "admin", "password": "x"})
     assert resp.status_code == 400
