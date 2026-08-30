@@ -37,7 +37,8 @@ from db import (delete_device, get_all_devices, get_all_statuses,
                 get_incidents, get_all_monitors, get_monitor, upsert_monitor,
                 get_monitor_statuses, update_heartbeat_ts,
                 get_uptime_percentage, get_avg_latency, get_incidents_for_monitor,
-                get_history_timeseries, get_heartbeat_buckets)
+                get_history_timeseries, get_heartbeat_buckets,
+                get_uptime_and_latency_bulk, get_incidents_bulk)
 from monitor_worker import run_monitor_cycle, start_background_monitor
 from notifications import delete_subscription, init_push_table, save_subscription
 from validators import validate_monitor
@@ -916,12 +917,9 @@ def api_stats_summary():
     down_count = sum(1 for s in statuses if s.get("state") == "down")
     degraded_count = sum(1 for s in statuses if s.get("state") == "degraded")
 
-    # Calculate average uptime across all monitors
-    uptimes = []
-    for s in statuses:
-        device_id = s["device_id"]
-        uptime = get_uptime_percentage(device_id, hours=24)
-        uptimes.append(uptime)
+    # Uptime medio de todos los monitores, en una sola consulta
+    bulk = get_uptime_and_latency_bulk(hours=24)
+    uptimes = [bulk.get(s["device_id"], {}).get("uptime_pct", 100.0) for s in statuses]
     avg_uptime = round(sum(uptimes) / len(uptimes), 2) if uptimes else 100.0
 
     return jsonify({
@@ -947,6 +945,9 @@ def api_status_page():
     cutoff_24h = now - 86400
     monitors = get_all_monitors()
     statuses = {s["device_id"]: s for s in get_monitor_statuses()}
+    # Dos consultas para todos los monitores, en vez de tres por monitor.
+    bulk = get_uptime_and_latency_bulk(hours=24)
+    incidents_by_monitor = get_incidents_bulk(hours=24)
 
     monitor_list = []
     down_count = 0
@@ -960,8 +961,9 @@ def api_status_page():
         elif state == "degraded":
             degraded_count += 1
 
-        uptime_24h = get_uptime_percentage(m["id"], hours=24)
-        avg_latency = get_avg_latency(m["id"], hours=24)
+        stats = bulk.get(m["id"], {})
+        uptime_24h = stats.get("uptime_pct", 100.0)
+        avg_latency = stats.get("avg_latency_ms")
 
         monitor_list.append({
             "id": m["id"],
@@ -985,8 +987,7 @@ def api_status_page():
     # Incidents in last 24h
     incidents_24h = []
     for m in monitors:
-        incidents = get_incidents_for_monitor(m["id"], limit=50)
-        for inc in incidents:
+        for inc in incidents_by_monitor.get(m["id"], []):
             if inc["start_ts"] >= cutoff_24h:
                 incidents_24h.append({
                     "monitor_id": m["id"],

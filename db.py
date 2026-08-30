@@ -529,6 +529,46 @@ def get_avg_latency(device_id: str, hours: int = 24) -> float | None:
             return round(float(row["avg_ms"]), 1)
 
 
+def _incidents_from_rows(rows: list[dict]) -> list[dict]:
+    """Extrae periodos de caída de un historial ordenado ASC por ts.
+
+    Una incidencia empieza cuando el estado pasa a 'down' y termina en el
+    primer check que no lo es. Devuelve la más reciente primero.
+    """
+    incidents = []
+    incident_start = None
+    incident_message = ""
+
+    for row in rows:
+        state = row.get("state") or ("up" if row["online"] else "down")
+        if state == "down" and incident_start is None:
+            incident_start = row["ts"]
+            incident_message = row.get("message", "")
+        elif state != "down" and incident_start is not None:
+            incidents.append({
+                "start_ts": incident_start,
+                "end_ts": row["ts"],
+                "duration_seconds": row["ts"] - incident_start,
+                "state": "down",
+                "message": incident_message,
+            })
+            incident_start = None
+            incident_message = ""
+
+    # Incidencia todavía abierta (no se encontró recuperación)
+    if incident_start is not None:
+        incidents.append({
+            "start_ts": incident_start,
+            "end_ts": None,
+            "duration_seconds": time.time() - incident_start,
+            "state": "down",
+            "message": incident_message,
+        })
+
+    incidents.reverse()
+    return incidents
+
+
 def get_incidents_for_monitor(device_id: str, limit: int = 20) -> list[dict]:
     """
     Returns incidents (down periods) for a specific monitor with duration.
@@ -536,7 +576,6 @@ def get_incidents_for_monitor(device_id: str, limit: int = 20) -> list[dict]:
     """
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            # Get state transitions to/from down for this device
             cur.execute("""
                 SELECT ts, state, message, online
                 FROM status_history
@@ -546,46 +585,64 @@ def get_incidents_for_monitor(device_id: str, limit: int = 20) -> list[dict]:
             """, (device_id,))
             rows = [dict(r) for r in cur.fetchall()]
 
-    # Process rows (ordered DESC) to find incidents
-    # An incident starts when state becomes 'down' and ends when it becomes non-down
-    incidents = []
-    rows.reverse()  # Now ASC order
+    rows.reverse()  # ASC
+    return _incidents_from_rows(rows)[:limit]
 
-    incident_start = None
-    incident_message = ""
 
+def get_incidents_bulk(hours: int = 24) -> dict[str, list[dict]]:
+    """Incidencias de TODOS los monitores en una sola consulta.
+
+    Equivalente a llamar get_incidents_for_monitor() por monitor y filtrar por
+    la ventana, pero sin una consulta (y una conexión) por dispositivo.
+    """
+    since = time.time() - hours * 3600
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT device_id, ts, state, message, online
+                FROM status_history
+                WHERE ts >= %s
+                ORDER BY device_id, ts ASC
+            """, (since,))
+            rows = [dict(r) for r in cur.fetchall()]
+
+    by_device: dict[str, list[dict]] = {}
     for row in rows:
-        state = row.get("state", "up" if row["online"] else "down")
-        if state == "down" and incident_start is None:
-            incident_start = row["ts"]
-            incident_message = row.get("message", "")
-        elif state != "down" and incident_start is not None:
-            # Incident ended
-            duration = row["ts"] - incident_start
-            incidents.append({
-                "start_ts": incident_start,
-                "end_ts": row["ts"],
-                "duration_seconds": duration,
-                "state": "down",
-                "message": incident_message,
-            })
-            incident_start = None
-            incident_message = ""
+        by_device.setdefault(row["device_id"], []).append(row)
+    return {device_id: _incidents_from_rows(device_rows)
+            for device_id, device_rows in by_device.items()}
 
-    # If currently in an incident (no recovery found)
-    if incident_start is not None:
-        duration = time.time() - incident_start
-        incidents.append({
-            "start_ts": incident_start,
-            "end_ts": None,
-            "duration_seconds": duration,
-            "state": "down",
-            "message": incident_message,
-        })
 
-    # Return most recent first, limited
-    incidents.reverse()
-    return incidents[:limit]
+def get_uptime_and_latency_bulk(hours: int = 24) -> dict[str, dict]:
+    """Uptime % y latencia media de TODOS los monitores en una sola consulta.
+
+    {device_id: {"uptime_pct": float, "avg_latency_ms": float | None}}
+    Los monitores sin historial en la ventana no aparecen; trátalos como 100%,
+    igual que hace get_uptime_percentage().
+    """
+    since = time.time() - hours * 3600
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT device_id,
+                       COUNT(*) AS total,
+                       SUM(CASE WHEN state IN ('up', 'degraded') THEN 1 ELSE 0 END) AS up_count,
+                       AVG(response_ms) AS avg_ms
+                FROM status_history
+                WHERE ts >= %s
+                GROUP BY device_id
+            """, (since,))
+            rows = cur.fetchall()
+
+    result = {}
+    for row in rows:
+        total = float(row["total"] or 0)
+        uptime = round(float(row["up_count"] or 0) / total * 100, 2) if total else 100.0
+        result[row["device_id"]] = {
+            "uptime_pct": uptime,
+            "avg_latency_ms": round(float(row["avg_ms"]), 1) if row["avg_ms"] is not None else None,
+        }
+    return result
 
 
 def get_history_timeseries(device_id: str, hours: int = 24) -> list[dict]:
