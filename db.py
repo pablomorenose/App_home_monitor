@@ -6,32 +6,76 @@ Gestión de la base de datos PostgreSQL (Supabase).
 """
 
 import json
+import logging
 import os
+import threading
 import time
 from contextlib import contextmanager
 
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 
-from config import DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
+from config import DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER, MAX_CHECK_WORKERS
+
+logger = logging.getLogger("db")
+
+# El pool debe cubrir todos los hilos de check simultáneos más los que sirvan
+# peticiones HTTP; si se queda corto, getconn() falla en vez de esperar.
+DB_POOL_MAX = int(os.getenv("DB_POOL_MAX", str(MAX_CHECK_WORKERS + 8)))
+_POOL_WAIT_SECONDS = 10.0
+
+_pool = None
+_pool_lock = threading.Lock()
+
+
+def _get_pool():
+    """Pool perezoso y compartido. Antes se abría una conexión TCP nueva en
+    cada llamada a get_db(), y hay endpoints que la llaman decenas de veces."""
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                _pool = psycopg2.pool.ThreadedConnectionPool(
+                    minconn=1,
+                    maxconn=DB_POOL_MAX,
+                    host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
+                    user=DB_USER, password=DB_PASSWORD,
+                    sslmode=os.getenv("DB_SSLMODE", "require"),
+                )
+                logger.info("Pool de conexiones creado (maxconn=%d)", DB_POOL_MAX)
+    return _pool
+
+
+def _acquire(pool):
+    """getconn() con espera: el pool lanza PoolError al agotarse en vez de
+    bloquear, y un pico de checks concurrentes no debe tumbar un ciclo."""
+    deadline = time.monotonic() + _POOL_WAIT_SECONDS
+    while True:
+        try:
+            return pool.getconn()
+        except psycopg2.pool.PoolError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.05)
 
 
 @contextmanager
 def get_db():
-    conn = psycopg2.connect(
-        host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
-        user=DB_USER, password=DB_PASSWORD,
-        sslmode=os.getenv("DB_SSLMODE", "require"),
-    )
+    pool = _get_pool()
+    conn = _acquire(pool)
     conn.autocommit = False
     try:
         yield conn
         conn.commit()
     except Exception:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except psycopg2.Error:
+            pass  # conexión rota; putconn la descarta
         raise
     finally:
-        conn.close()
+        pool.putconn(conn)
 
 
 def init_db():

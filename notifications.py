@@ -8,34 +8,13 @@ siguen siendo necesarias y se usan desde alerts.py y app.py.
 """
 
 import json
-import os
 import time
-from contextlib import contextmanager
 
-import psycopg2
 import psycopg2.extras
 from pywebpush import webpush, WebPushException
 
-from config import DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
 from config import VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VAPID_CLAIMS_EMAIL
-
-
-@contextmanager
-def get_db():
-    conn = psycopg2.connect(
-        host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
-        user=DB_USER, password=DB_PASSWORD,
-        sslmode=os.getenv("DB_SSLMODE", "require"),
-    )
-    conn.autocommit = False
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+from db import get_db
 
 
 def init_push_table():

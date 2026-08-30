@@ -92,6 +92,7 @@ docker compose up -d
 | `DB_NAME` | No | `postgres` | Database name |
 | `DB_USER` | No | `postgres` | Database user |
 | `DB_PASSWORD` | **Yes** | — | Database password |
+| `DB_POOL_MAX` | No | `MAX_CHECK_WORKERS + 8` | Max pooled DB connections |
 | `CHECK_INTERVAL_SECONDS` | No | `15` | Default check interval (min 5) |
 | `MAX_CHECK_WORKERS` | No | `20` | Max concurrent check threads |
 | `HOME_ASSISTANT_URL` | No | — | HA base URL (enables HA monitors) |
