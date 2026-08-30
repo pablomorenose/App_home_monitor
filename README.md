@@ -103,6 +103,7 @@ python3 app.py
 | `DB_USER` | No | `postgres` | Database user |
 | `DB_PASSWORD` | **Yes** | — | Database password |
 | `DB_POOL_MAX` | No | `MAX_CHECK_WORKERS + 8` | Max pooled DB connections |
+| `DB_SSLMODE` | No | `require` | libpq SSL mode; compose sets `disable` for the local container |
 | `CHECK_INTERVAL_SECONDS` | No | `15` | Default check interval (min 5) |
 | `MAX_CHECK_WORKERS` | No | `20` | Max concurrent check threads |
 | `HOME_ASSISTANT_URL` | No | — | HA base URL (enables HA monitors) |
@@ -164,27 +165,22 @@ python3 app.py
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Docker Container                    │
-│                                                      │
-│  ┌──────────┐    ┌───────────────┐    ┌──────────┐ │
-│  │  Flask   │    │ Monitor Worker│    │  Alerts  │ │
-│  │  (app.py)│    │ (background)  │    │  Engine  │ │
-│  └────┬─────┘    └───────┬───────┘    └────┬─────┘ │
-│       │                  │                  │       │
-│       └──────────┬───────┘──────────────────┘       │
-│                  │                                   │
-│           ┌──────┴──────┐                           │
-│           │   db.py     │                           │
-│           │ (PostgreSQL)│                           │
-│           └──────┬──────┘                           │
-└──────────────────┼───────────────────────────────────┘
-                   │
-            ┌──────┴──────┐
-            │  PostgreSQL  │
-            │  (Supabase)  │
-            └─────────────┘
+docker compose
+│
+├── home-monitor              gunicorn, 1 worker / 8 threads
+│     │
+│     ├── Flask app + routes/     HTTP API and dashboard
+│     ├── Monitor Worker          background thread, runs the checks
+│     ├── Alerts Engine           Web Push / Telegram / Webhook
+│     └── db.py ─────────────┐    pooled connections
+│                            │
+└── home-monitor-db          │
+      postgres:16-alpine  ◄──┘
+      volume: home-monitor-db-data
 ```
+
+Both containers come from this repo's `docker-compose.yml`; the database is
+local to the host and never exposed outside the compose network.
 
 - **wsgi.py** — WSGI entrypoint used by gunicorn; runs the one-time bootstrap
 - **app.py** — App assembly: config, blueprint registration, security headers, bootstrap
@@ -221,14 +217,15 @@ building the image.
 - Login form is CSRF-protected and credentials are compared in constant time
 - Docker: read-only filesystem, no-new-privileges, all capabilities dropped
 - Non-root user inside container
-- DB connections use SSL (`sslmode=require`)
+- DB connections default to `sslmode=require`; the bundled Postgres container
+  runs with `DB_SSLMODE=disable`, since that traffic never leaves the compose network
 - Input validation on all monitor creation/update
 
 ## Migration from v1
 
 v1 used a simpler device model with just HTTP/ping/HA checks and SQLite. v2 brings:
 
-1. **PostgreSQL** — Replace SQLite with PostgreSQL (Supabase) for reliability
+1. **PostgreSQL** — Replace SQLite with PostgreSQL for reliability
 2. **Extended monitor model** — Retries, intervals, dependencies, tags, state machine
 3. **New check types** — DNS, TLS, Docker, Heartbeat added
 4. **State machine** — Proper pending/up/down/degraded/maintenance states
@@ -240,10 +237,10 @@ v1 used a simpler device model with just HTTP/ping/HA checks and SQLite. v2 brin
 10. **Health endpoint** — For Docker/K8s health checks
 
 ### Steps to migrate:
-1. Set up a PostgreSQL database (Supabase free tier works well)
-2. Update `.env` with new DB credentials
-3. The app will auto-create tables on first run
-4. Re-create your monitors via the API or UI (old SQLite data is not auto-migrated)
+1. Set `DB_PASSWORD` in `.env` — `docker compose up -d` brings up the Postgres
+   container alongside the app
+2. The app auto-creates tables and indexes on first run
+3. Re-create your monitors via the API or UI (old SQLite data is not auto-migrated)
 
 ## License
 

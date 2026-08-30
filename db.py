@@ -1,5 +1,5 @@
 """
-Gestión de la base de datos PostgreSQL (Supabase).
+Gestión de la base de datos PostgreSQL.
 - device_status: estado actual de cada dispositivo
 - status_history: historial de cambios de estado
 - devices: configuración de dispositivos (gestionada desde la app)

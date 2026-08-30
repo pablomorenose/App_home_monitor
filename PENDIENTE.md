@@ -136,7 +136,7 @@
 ## Notas de infraestructura
 
 - La app corre en Raspberry Pi 4 con Docker
-- BD: PostgreSQL en Supabase (free tier)
+- BD: contenedor postgres:16-alpine en el propio compose, con volumen persistente
 - Acceso: Tailscale Funnel (HTTPS automático, gratis)
 - Despliegue manual desde Portainer (sin auto-update: los cambios de esquema
   y de configuración deben revisarse antes de subirlos)
