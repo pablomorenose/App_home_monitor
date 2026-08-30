@@ -27,7 +27,8 @@ from flask import Flask, jsonify, render_template, request, session, redirect, u
 
 from config import (
     SECRET_KEY, ACCESS_PASSWORD, ADMIN_USERNAME, VAPID_PUBLIC_KEY, APP_ENV, PUSH_ENABLED,
-    DOCKER_METRICS_ENABLED, STATUS_PAGE_ENABLED, APP_VERSION, validate_config,
+    DOCKER_METRICS_ENABLED, STATUS_PAGE_ENABLED, SESSION_COOKIE_SECURE, APP_VERSION,
+    validate_config,
 )
 from csrf import get_csrf_token, csrf_protect
 from db import (delete_device, get_all_devices, get_all_statuses,
@@ -48,7 +49,7 @@ app.secret_key = SECRET_KEY
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=False,  # Allow HTTP (LAN) + HTTPS (Tailscale Funnel)
+    SESSION_COOKIE_SECURE=SESSION_COOKIE_SECURE,  # ver config.py
     PERMANENT_SESSION_LIFETIME=30 * 24 * 3600,  # 30 days
 )
 

@@ -40,6 +40,11 @@ ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 # Si es true, permite arrancar sin ACCESS_PASSWORD (solo desarrollo)
 ALLOW_INSECURE_NO_AUTH = os.getenv("ALLOW_INSECURE_NO_AUTH", "false").lower() == "true"
 
+# Marca Secure en la cookie de sesión. Por defecto false porque el dashboard
+# se usa también por HTTP en la LAN, donde una cookie Secure no se enviaría.
+# Ponlo a true si solo entras por HTTPS (p. ej. solo Tailscale Funnel).
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+
 # ────────────────────────────────────────────────────────────────────
 # BASE DE DATOS
 # ────────────────────────────────────────────────────────────────────
@@ -73,7 +78,10 @@ HA_ENABLED = bool(HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN)
 # ────────────────────────────────────────────────────────────────────
 # STATUS PAGE (public, no auth required)
 # ────────────────────────────────────────────────────────────────────
-STATUS_PAGE_ENABLED = os.getenv("STATUS_PAGE_ENABLED", "true").lower() == "true"
+# Desactivada por defecto: expone nombres de dispositivos, latencias y mensajes
+# de incidencia (que suelen incluir URLs internas) sin autenticación, y esta app
+# se publica a menudo por Tailscale Funnel, o sea internet.
+STATUS_PAGE_ENABLED = os.getenv("STATUS_PAGE_ENABLED", "false").lower() == "true"
 
 # ────────────────────────────────────────────────────────────────────
 # DOCKER METRICS
@@ -205,6 +213,14 @@ def validate_config():
             warnings.append(msg)
 
     # --- ACCESS_PASSWORD ---
+    # ALLOW_INSECURE_NO_AUTH deja toda la app sin autenticación (require_auth()
+    # devuelve False si no hay contraseña). Nunca puede activarse en producción.
+    if ALLOW_INSECURE_NO_AUTH and is_production:
+        errors.append(
+            "ALLOW_INSECURE_NO_AUTH=true no se admite con APP_ENV=production: "
+            "dejaría la aplicación entera sin autenticación."
+        )
+
     if not ACCESS_PASSWORD and not ALLOW_INSECURE_NO_AUTH:
         msg = (
             "ACCESS_PASSWORD no está configurada. "

@@ -48,7 +48,7 @@ Each monitor transitions through: `pending` → `up` / `down` / `degraded` / `ma
 
 ### Security
 - CSRF protection on all mutations
-- Secure session cookies (HttpOnly, SameSite, Secure in production)
+- Secure session cookies (HttpOnly, SameSite; Secure opt-in via `SESSION_COOKIE_SECURE`)
 - Security headers (CSP, HSTS, X-Frame-Options, etc.)
 - Rate-limited login
 - Docker hardening (read-only FS, no-new-privileges, cap-drop ALL)
@@ -100,10 +100,11 @@ docker compose up -d
 | `VAPID_PUBLIC_KEY` | No | — | Web Push public key |
 | `VAPID_CLAIMS_EMAIL` | No | — | Web Push contact email |
 | `DOCKER_METRICS_ENABLED` | No | `true` | Enable Docker stats collection |
-| `STATUS_PAGE_ENABLED` | No | `true` | Enable public status page API |
+| `STATUS_PAGE_ENABLED` | No | `false` | Enable the **unauthenticated** public status page API |
 | `LOG_LEVEL` | No | `INFO` | Logging level |
 | `TZ` | No | `Europe/Madrid` | Timezone |
-| `ALLOW_INSECURE_NO_AUTH` | No | `false` | Dev only: allow no password |
+| `ALLOW_INSECURE_NO_AUTH` | No | `false` | Dev only: allow no password. Refused when `APP_ENV=production` |
+| `SESSION_COOKIE_SECURE` | No | `false` | Set `Secure` on the session cookie (turn on if you only use HTTPS) |
 | `HISTORY_RETENTION_DAYS` | No | `30` | Days to retain history data |
 
 ## API Endpoints
@@ -188,7 +189,7 @@ docker compose up -d
 
 - All secrets are loaded from environment variables — never hardcoded
 - CSRF tokens required on all POST/PUT/DELETE endpoints
-- Session cookies: HttpOnly, SameSite=Lax, Secure (production)
+- Session cookies: HttpOnly, SameSite=Lax, and `Secure` when `SESSION_COOKIE_SECURE=true` (off by default so the dashboard still works over plain HTTP on the LAN)
 - Security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options
 - Login rate limiting (5 attempts per 5 minutes per IP)
 - Docker: read-only filesystem, no-new-privileges, all capabilities dropped
