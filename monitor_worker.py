@@ -80,12 +80,16 @@ def run_checks_once():
                 logger.error("Error comprobando dispositivo: %s", e)
 
 
-def run_monitor_cycle():
+def run_monitor_cycle(force: bool = False):
     """
     Phase 2 monitor cycle with state machine integration.
     Groups monitors by check_interval and runs the appropriate ones each cycle.
+
+    force=True comprueba todos los monitores habilitados ignorando su
+    check_interval, y espera al ciclo en curso en vez de saltarse el turno.
+    Lo usa /api/force-check y el arranque.
     """
-    if not _cycle_lock.acquire(blocking=False):
+    if not _cycle_lock.acquire(blocking=force):
         logger.warning("Ciclo anterior todavía en ejecución, saltando.")
         return
 
@@ -104,7 +108,7 @@ def run_monitor_cycle():
             monitor_id = m["id"]
             status = statuses.get(monitor_id, {})
             last_check = float(status.get("last_check_ts", 0))
-            if (now - last_check) >= interval:
+            if force or (now - last_check) >= interval:
                 due_monitors.append(m)
 
         if not due_monitors:

@@ -204,7 +204,12 @@ def seed_devices_from_config():
 def update_status(device_id: str, name: str, online: bool,
                   error: str | None = None, response_ms: int | None = None,
                   switch_state: str | None = None,
-                  state: str = "up", message: str = ""):
+                  state: str | None = None, message: str = ""):
+    # Si no se indica estado explícito, derivarlo de `online`. Antes el valor
+    # por defecto era "up" fijo, así que un check fallido se guardaba en el
+    # historial como state='up' y salía verde en las barras y en el uptime.
+    if state is None:
+        state = "up" if online else "down"
     now = time.time()
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

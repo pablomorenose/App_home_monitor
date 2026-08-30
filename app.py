@@ -34,7 +34,7 @@ from db import (delete_device, get_all_devices, get_all_statuses, get_history,
                 get_monitor_statuses, update_heartbeat_ts,
                 get_uptime_percentage, get_avg_latency, get_incidents_for_monitor,
                 get_history_timeseries, get_recent_heartbeats, get_heartbeat_buckets)
-from monitor_worker import run_checks_once, start_background_monitor
+from monitor_worker import run_monitor_cycle, start_background_monitor
 from notifications import delete_subscription, init_push_table, save_subscription
 from validators import validate_monitor
 
@@ -176,9 +176,9 @@ def historial():
 @csrf_protect
 def api_force_check():
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
-    from monitor_worker import run_checks_once
     import threading
-    threading.Thread(target=run_checks_once, daemon=True).start()
+    threading.Thread(target=run_monitor_cycle, kwargs={"force": True},
+                     daemon=True).start()
     return jsonify({"ok": True})
 
 
@@ -1223,6 +1223,6 @@ if __name__ == "__main__":
     init_db()
     init_push_table()
     seed_devices_from_config()
-    run_checks_once()
+    run_monitor_cycle(force=True)
     start_background_monitor()
     app.run(host="0.0.0.0", port=8088, debug=False)
