@@ -7,3 +7,6 @@ __pycache__
 *.md
 deploy/
 *.toml
+tests/
+pytest.ini
+requirements-dev.txt

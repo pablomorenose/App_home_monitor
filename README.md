@@ -197,6 +197,17 @@ python3 app.py
 - **validators.py** — Input validation for monitor data
 - **csrf.py** — CSRF token generation and verification
 
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+The suite covers the pure logic: state transitions, monitor validation,
+incident extraction and the check helpers. It needs no database and no
+network. CI runs it before building the image.
+
 ## Security Notes
 
 - All secrets are loaded from environment variables — never hardcoded
