@@ -55,10 +55,44 @@
 
 ---
 
+## ✅ Ronda de correcciones (agosto 2026)
+
+### Bugs de datos
+- [x] `update_status()` guardaba `state='up'` fijo: los force-check y cada
+      reinicio metían checks falsos en verde en el historial
+- [x] `/api/uptime` daba ~9% en monitores sanos (reconstruía segmentos
+      suponiendo que el historial solo guardaba cambios de estado)
+- [x] Los monitores `heartbeat` nunca caían: medían contra `last_check_ts`,
+      que el worker refresca cada ciclo. Ahora hay `last_heartbeat_ts`
+- [x] Las alertas de recuperación se perdían si la caída duraba <5 min
+- [x] XSS en el botón de borrar: el nombre del monitor se interpolaba sin
+      escapar dentro del `onclick`
+
+### Seguridad
+- [x] `POST /api/heartbeat/<id>` era público y creaba filas con ids inventados
+- [x] `ALLOW_INSECURE_NO_AUTH=true` funcionaba en producción
+- [x] `STATUS_PAGE_ENABLED` pasa a false por defecto
+- [x] Login: CSRF, comparación en tiempo constante, IP real tras proxy
+      (`TRUSTED_PROXIES`), purga del dict de intentos
+- [x] CSP sin `unsafe-inline` en `script-src`
+
+### Rendimiento
+- [x] Índices en `status_history (device_id, ts)` y `(ts)`
+- [x] Pool de conexiones en vez de una conexión nueva por consulta
+- [x] N+1 eliminado en `/api/status-page` y `/api/stats/summary`
+- [x] gunicorn en producción en vez del servidor de desarrollo de Werkzeug
+
+### Mantenibilidad
+- [x] `/api/pi-stats` borrado (257 líneas muertas)
+- [x] `app.py` 1014 → 98 líneas; vistas repartidas en `routes/`
+- [x] `index.html` 1164 → 129 líneas; CSS y JS en `/static`
+- [x] 51 tests y CI que los ejecuta (antes solo construía la imagen)
+
+---
+
 ## 🔮 Pendiente para futuras versiones
 
 ### v2.1 — Mejoras de alertas
-- [ ] Telegram bot notifications (config: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
 - [ ] Email alerts (SMTP)
 - [ ] Alert escalation (notify different channels after X minutes)
 - [ ] Alert acknowledgement API
