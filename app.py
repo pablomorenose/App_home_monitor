@@ -28,12 +28,12 @@ from config import (
     DOCKER_METRICS_ENABLED, STATUS_PAGE_ENABLED, APP_VERSION, validate_config,
 )
 from csrf import get_csrf_token, csrf_protect
-from db import (delete_device, get_all_devices, get_all_statuses, get_history,
+from db import (delete_device, get_all_devices, get_all_statuses,
                 init_db, seed_devices_from_config, upsert_device, get_latency_history,
                 get_incidents, get_all_monitors, get_monitor, upsert_monitor,
                 get_monitor_statuses, update_heartbeat_ts,
                 get_uptime_percentage, get_avg_latency, get_incidents_for_monitor,
-                get_history_timeseries, get_recent_heartbeats, get_heartbeat_buckets)
+                get_history_timeseries, get_heartbeat_buckets)
 from monitor_worker import run_monitor_cycle, start_background_monitor
 from notifications import delete_subscription, init_push_table, save_subscription
 from validators import validate_monitor
@@ -563,69 +563,37 @@ def api_status():
 
 @app.route("/api/uptime/<device_id>")
 def api_uptime(device_id):
-    if require_auth(): return jsonify({"error": "No autorizado"}), 401
-    """Devuelve segmentos de estado para las últimas 24h.
-    Cada segmento tiene: start, end, online (bool).
+    """Uptime de las últimas 24h: porcentaje y segmentos de estado.
+
+    El porcentaje viene de get_uptime_percentage(), que cuenta los checks
+    reales de toda la ventana. Los segmentos se derivan de los mismos buckets
+    de 15 min que alimentan las barras de heartbeat, así ambos coinciden.
+
+    (Antes esto reconstruía segmentos a mano asumiendo que status_history solo
+    guardaba cambios de estado. Desde que se registra un check por ciclo, esa
+    suposición era falsa y el porcentaje salía absurdamente bajo.)
     """
-    now = time.time()
-    since = now - 86400  # 24 horas
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
 
-    history = get_history(device_id, limit=500)
-    # history viene ordenado DESC (más reciente primero)
+    hours = 24
+    span = hours * 3600.0
+    uptime_pct = get_uptime_percentage(device_id, hours=hours)
+    buckets = get_heartbeat_buckets(device_id, hours=hours, bucket_minutes=15)
 
-    # Construir segmentos de tiempo
+    # Fusionar buckets consecutivos del mismo estado en segmentos.
     segments = []
-    # Añadir el momento actual como punto de corte
-    events = [{"ts": now, "online": None}]  # sentinel
-    for h in history:
-        if h["ts"] >= since:
-            events.append({"ts": h["ts"], "online": bool(h["online"])})
-    # Añadir inicio del periodo
-    events.append({"ts": since, "online": None})
+    for bk in buckets:
+        if bk["state"] == "unknown":
+            continue
+        online = bk["state"] in ("up", "degraded")
+        prev = segments[-1] if segments else None
+        if prev and prev["online"] == online and prev["end"] == bk["start"]:
+            prev["end"] = bk["end"]
+        else:
+            segments.append({"start": bk["start"], "end": bk["end"], "online": online})
 
-    # Ordenar ASC
-    events.sort(key=lambda x: x["ts"])
-
-    # Obtener estado actual del dispositivo
-    statuses = get_all_statuses()
-    current = next((s for s in statuses if s["device_id"] == device_id), None)
-    current_online = bool(current["online"]) if current else True
-
-    # Reconstruir segmentos
-    # Empezamos desde since con el estado más antiguo conocido
-    seg_start = since
-    # El estado al inicio del periodo es el estado actual si no hay cambios,
-    # o el primer evento más antiguo
-    if len(events) <= 2:
-        # Sin cambios en 24h
-        segments.append({"start": since, "end": now, "online": current_online, "pct": 100})
-    else:
-        # Recorremos los eventos en orden ASC ignorando sentinels
-        real_events = [e for e in events if e["online"] is not None]
-        # El estado inicial es el opuesto del primer cambio registrado
-        # (porque history guarda el estado TRAS el cambio)
-        if real_events:
-            state = not real_events[0]["online"]  # estado antes del primer cambio
-            seg_start = since
-            for ev in real_events:
-                if ev["ts"] > since:
-                    segments.append({
-                        "start": seg_start, "end": ev["ts"],
-                        "online": state,
-                        "pct": (ev["ts"] - seg_start) / 864
-                    })
-                    seg_start = ev["ts"]
-                state = ev["online"]
-            # Último segmento hasta ahora
-            segments.append({
-                "start": seg_start, "end": now,
-                "online": state,
-                "pct": (now - seg_start) / 864
-            })
-
-    # Calcular % uptime total
-    online_secs = sum((s["end"] - s["start"]) for s in segments if s["online"])
-    uptime_pct = round(online_secs / 864, 1)
+    for seg in segments:
+        seg["pct"] = (seg["end"] - seg["start"]) / span * 100
 
     return jsonify({"segments": segments, "uptime_pct": uptime_pct})
 
