@@ -138,5 +138,6 @@
 - La app corre en Raspberry Pi 4 con Docker
 - BD: PostgreSQL en Supabase (free tier)
 - Acceso: Tailscale Funnel (HTTPS automático, gratis)
-- Auto-update: cron cada 5 min hace git pull + rebuild
+- Despliegue manual desde Portainer (sin auto-update: los cambios de esquema
+  y de configuración deben revisarse antes de subirlos)
 - Docker socket montado para métricas de contenedores
