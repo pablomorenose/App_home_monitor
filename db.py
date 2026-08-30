@@ -119,6 +119,20 @@ def init_db():
             cur.execute("ALTER TABLE device_status ADD COLUMN IF NOT EXISTS last_notification_ts DOUBLE PRECISION NOT NULL DEFAULT 0")
             cur.execute("ALTER TABLE device_status ADD COLUMN IF NOT EXISTS incident_id TEXT")
 
+            # ─── Índices ───
+            # status_history crece ~1 fila por check y monitor (decenas de miles
+            # al día). Sin estos índices todas las consultas del dashboard hacen
+            # seq scan de la tabla completa.
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_history_device_ts
+                ON status_history (device_id, ts DESC)
+            """)
+            # Para cleanup_old_history / get_incidents, que filtran solo por ts.
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_history_ts
+                ON status_history (ts DESC)
+            """)
+
 
 # -----------------------------------------------------------------------
 # Gestión de dispositivos (tabla devices)
