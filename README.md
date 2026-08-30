@@ -152,7 +152,6 @@ python3 app.py
 | `GET` | `/api/incidents` | Global incident history |
 | `GET` | `/api/devices` | List devices (legacy) |
 | `POST` | `/api/devices` | Add device (legacy) |
-| `GET` | `/api/pi-stats` | Raspberry Pi system stats |
 | `POST` | `/api/force-check` | Trigger immediate check |
 
 ### Auth endpoints
