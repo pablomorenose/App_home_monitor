@@ -17,6 +17,8 @@ Endpoints:
   DELETE /api/devices/<id>  -> borrar dispositivo
 """
 
+import hashlib
+import hmac
 import time
 from collections import defaultdict
 import time as _time
@@ -772,11 +774,50 @@ def remove_monitor(monitor_id):
 # Heartbeat endpoint (Phase 2)
 # -----------------------------------------------------------------------
 
+def heartbeat_token(monitor_id: str) -> str:
+    """Token estable por monitor, derivado de SECRET_KEY.
+
+    No necesita almacenamiento ni migración: se recalcula igual en cada
+    arranque. Rotar SECRET_KEY invalida todos los tokens de heartbeat.
+    """
+    return hmac.new(
+        SECRET_KEY.encode("utf-8"),
+        f"heartbeat:{monitor_id}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()[:32]
+
+
 @app.route("/api/heartbeat/<monitor_id>", methods=["POST"])
 def api_heartbeat(monitor_id):
-    """Receives a heartbeat ping from an external service."""
-    update_heartbeat_ts(monitor_id)
+    """Recibe un ping de un servicio externo.
+
+    Sin sesión (lo llaman cron jobs y scripts), pero autenticado con el token
+    del monitor: por cabecera X-Heartbeat-Token (preferido, no acaba en los
+    logs del proxy) o por ?token= para clientes simples tipo curl.
+    """
+    token = request.headers.get("X-Heartbeat-Token") or request.args.get("token", "")
+    if not hmac.compare_digest(token, heartbeat_token(monitor_id)):
+        return jsonify({"error": "Token inválido"}), 403
+    if not update_heartbeat_ts(monitor_id):
+        return jsonify({"error": "Monitor no encontrado"}), 404
     return jsonify({"ok": True})
+
+
+@app.route("/api/monitors/<monitor_id>/heartbeat-url")
+def api_heartbeat_url(monitor_id):
+    """Devuelve la URL y el token que debe usar el servicio externo."""
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    m = get_monitor(monitor_id)
+    if not m:
+        return jsonify({"error": "Monitor no encontrado"}), 404
+    token = heartbeat_token(monitor_id)
+    return jsonify({
+        "url": f"{request.host_url.rstrip('/')}/api/heartbeat/{monitor_id}",
+        "token": token,
+        "header": "X-Heartbeat-Token",
+        "curl": (f"curl -fsS -X POST -H 'X-Heartbeat-Token: {token}' "
+                 f"{request.host_url.rstrip('/')}/api/heartbeat/{monitor_id}"),
+    })
 
 
 # -----------------------------------------------------------------------

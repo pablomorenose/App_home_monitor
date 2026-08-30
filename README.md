@@ -113,7 +113,7 @@ docker compose up -d
 |--------|------|-------------|
 | `GET` | `/health` | Health check (status, DB, uptime, version) |
 | `GET` | `/api/status-page` | Public status page data |
-| `POST` | `/api/heartbeat/<id>` | Receive heartbeat ping |
+| `POST` | `/api/heartbeat/<id>` | Receive heartbeat ping (requires the monitor's token in the `X-Heartbeat-Token` header or `?token=`) |
 
 ### Authenticated
 | Method | Path | Description |
@@ -125,6 +125,7 @@ docker compose up -d
 | `PUT` | `/api/monitors/<id>` | Update monitor |
 | `DELETE` | `/api/monitors/<id>` | Delete monitor |
 | `GET` | `/api/monitors/<id>/stats` | Uptime %, latency, incidents |
+| `GET` | `/api/monitors/<id>/heartbeat-url` | Push URL + token for a heartbeat monitor |
 | `GET` | `/api/monitors/<id>/history` | Time-series history |
 | `GET` | `/api/stats/summary` | Global summary stats |
 | `GET` | `/api/groups` | Monitors grouped by tags |

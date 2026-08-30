@@ -750,12 +750,19 @@ def update_monitor_status(device_id: str, name: str, online: bool,
             )
 
 
-def update_heartbeat_ts(monitor_id: str):
-    """Actualiza last_check_ts para un monitor de tipo heartbeat."""
+def update_heartbeat_ts(monitor_id: str) -> bool:
+    """Registra un ping de heartbeat para un monitor existente.
+
+    Devuelve False si el monitor no está en `devices`, para que un POST a
+    /api/heartbeat/<id> con un id inventado no pueda crear filas huérfanas.
+    """
     now = time.time()
     with get_db() as conn:
         with conn.cursor() as cur:
-            # Use last_check_ts as the heartbeat ping timestamp
+            cur.execute("SELECT 1 FROM devices WHERE id = %s AND enabled = 1",
+                        (monitor_id,))
+            if cur.fetchone() is None:
+                return False
             cur.execute("""
                 UPDATE device_status
                 SET last_check_ts = %s
@@ -772,6 +779,7 @@ def update_heartbeat_ts(monitor_id: str):
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (monitor_id, monitor_id, 1, now, now, None, None, None,
                       'up', 0, 1, 0, None))
+    return True
 
 
 def get_incidents(limit: int = 100) -> list[dict]:
