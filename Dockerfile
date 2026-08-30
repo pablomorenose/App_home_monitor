@@ -33,6 +33,9 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
 
 # Un único worker a propósito: el hilo de monitorización corre dentro del
 # proceso. La concurrencia se saca de los threads.
+# --control-socket va a /tmp porque el contenedor arranca con read_only: true
+# y su valor por defecto ($HOME/.gunicorn/gunicorn.ctl) no se puede crear.
 CMD ["gunicorn", "--workers", "1", "--threads", "8", \
      "--bind", "0.0.0.0:8088", "--access-logfile", "-", \
-     "--timeout", "60", "wsgi:app"]
+     "--timeout", "60", "--control-socket", "/tmp/gunicorn.ctl", \
+     "wsgi:app"]
