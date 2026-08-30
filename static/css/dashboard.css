@@ -241,6 +241,9 @@
   .act-btn.maint.active{background:color-mix(in srgb,var(--amber) 16%,transparent);}
   .act-btn.del{color:var(--text-dim);}
   .act-btn.del:active{color:var(--red);}
+  .act-btn.poweroff{color:var(--text-dim);}
+  .act-btn.poweroff:hover{color:var(--red);border-color:color-mix(in srgb,var(--red) 30%,transparent);}
+  .act-btn.poweroff:active{color:var(--red);}
   .actions-hint{font-size:11px;color:var(--text-dim);margin-left:auto;}
 
   footer{margin-top:32px;text-align:center;font-size:11px;color:var(--text-dim);font-family:var(--mono);}

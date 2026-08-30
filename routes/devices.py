@@ -1,7 +1,10 @@
 """API de dispositivos: estado, historial corto y acciones sobre uno."""
 
+import json
 import time
+from urllib.parse import urlparse
 
+import requests
 from flask import Blueprint, jsonify, request
 
 from csrf import csrf_protect
@@ -16,8 +19,40 @@ bp = Blueprint("devices", __name__)
 
 
 # ─── Metrics cache (avoid slow calls on every /api/status request) ───
-_cache = {"system": {}, "system_ts": 0, "docker": [], "docker_ts": 0}
+_cache = {"system": {}, "system_ts": 0, "docker": [], "docker_ts": 0,
+          "remote_system": {}}
 _CACHE_TTL = 10  # seconds
+_REMOTE_CACHE_TTL = 15  # seconds — same as check interval
+
+
+def _get_cached_remote_system_metrics(device_id: str, url: str, timeout: int = 8) -> dict:
+    """Fetch and cache remote system metrics from metrics_agent HTTP endpoint."""
+    now = time.time()
+    cached = _cache["remote_system"].get(device_id, {})
+    if now - cached.get("_ts", 0) > _REMOTE_CACHE_TTL:
+        try:
+            from checks import check_remote_system
+            result = check_remote_system(url=url, timeout=timeout)
+            details = result.get("details", {})
+            data = {
+                "cpu_pct":      details.get("cpu_pct"),
+                "ram_pct":      details.get("ram_pct"),
+                "ram_total_mb": details.get("ram_total_mb"),
+                "ram_used_mb":  details.get("ram_used_mb"),
+                "temp_c":       details.get("temp_c"),
+                "disk_pct":     details.get("disk_pct"),
+                "disk_total_gb":details.get("disk_total_gb"),
+                "disk_used_gb": details.get("disk_used_gb"),
+                "uptime":       details.get("uptime"),
+                "_ts":          now,
+            }
+        except Exception:
+            data = cached  # keep old data on error
+            data["_ts"] = now
+        _cache["remote_system"][device_id] = data
+    result = dict(_cache["remote_system"].get(device_id, {}))
+    result.pop("_ts", None)
+    return result
 
 
 def _get_cached_system_metrics():
@@ -167,6 +202,21 @@ def api_status():
             except Exception:
                 pass
 
+        # Include remote system metrics inline for 'remote_system' type monitors
+        if cfg.get("type") == "remote_system":
+            try:
+                url = cfg.get("url", "")
+                if not url:
+                    url = json.loads(cfg.get("config_json") or "{}").get("url", "")
+                if url:
+                    entry.update(_get_cached_remote_system_metrics(
+                        device_id=cfg["id"],
+                        url=url,
+                        timeout=int(cfg.get("timeout", 8))
+                    ))
+            except Exception:
+                pass
+
         # Include docker container info inline for 'docker' type monitors (cached)
         if cfg.get("type") == "docker":
             try:
@@ -286,6 +336,31 @@ def edit_device(device_id):
     data["id"] = device_id
     upsert_device(data)
     return jsonify({"ok": True})
+
+
+@bp.route("/api/devices/<device_id>/poweroff", methods=["POST"])
+@csrf_protect
+def poweroff_device(device_id):
+    if require_auth(): return jsonify({"error": "No autorizado"}), 401
+    devices = {d["id"]: d for d in get_all_devices()}
+    device = devices.get(device_id)
+    if not device:
+        return jsonify({"error": "Dispositivo no encontrado"}), 404
+    if device.get("type") != "remote_system":
+        return jsonify({"error": "Solo se puede apagar dispositivos de tipo remote_system"}), 400
+    url = device.get("url", "")
+    if not url:
+        return jsonify({"error": "URL del agente no configurada"}), 400
+    # Extraer host del agente
+    parsed = urlparse(url)
+    agent_base = f"{parsed.scheme}://{parsed.netloc}"
+    try:
+        resp = requests.post(f"{agent_base}/poweroff", timeout=5)
+        if resp.status_code == 200:
+            return jsonify({"ok": True})
+        return jsonify({"error": f"El agente respondió {resp.status_code}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @bp.route("/api/devices/<device_id>", methods=["DELETE"])

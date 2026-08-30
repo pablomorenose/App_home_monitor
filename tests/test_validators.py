@@ -28,6 +28,10 @@ def test_tipo_desconocido():
     assert "type:" in errors_for(type="carrier_pigeon")
 
 
+def test_remote_system_es_un_tipo_valido():
+    assert validate_monitor({"id": "pc", "name": "PC", "type": "remote_system"}) == []
+
+
 def test_http_exige_esquema_valido():
     assert "url:" in errors_for(url="ftp://example.com")
     assert "url:" in errors_for(url="example.com")

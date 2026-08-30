@@ -105,7 +105,8 @@ const ICONS={
   grip:'<svg viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>',
   edit:'<svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
   wrench:'<svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
-  trash:'<svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>'
+  trash:'<svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>',
+  poweroff:'<svg viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>'
 };
 
 // Render de tarjetas — render diferencial in-place para evitar flicker.
@@ -200,7 +201,7 @@ function createRow(d, collapsedPref){
           <div class="device-left-slot"></div>
           ${haSensors}
           ${extraSensors}
-          ${d.type!=='system'?sparklineHtml(d.id):''}
+          ${(d.type!=='system'&&d.type!=='remote_system')?sparklineHtml(d.id):''}
         </div>
         <div class="device-right"></div>
       </div>
@@ -208,6 +209,7 @@ function createRow(d, collapsedPref){
       <div class="device-actions">
         <button class="act-btn edit" title="Editar" aria-label="Editar" data-action="edit-device" data-id="${escAttr(d.id)}">${ICONS.edit}</button>
         <button class="act-btn maint ${d.in_maintenance?'active':''}" title="Mantenimiento" aria-label="Mantenimiento" data-action="toggle-maintenance" data-id="${escAttr(d.id)}" data-maintenance="${d.in_maintenance?1:0}">${ICONS.wrench}</button>
+        ${d.type==='remote_system'?`<button class="act-btn poweroff" title="Apagar equipo" aria-label="Apagar" data-action="poweroff-device" data-id="${escAttr(d.id)}" data-name="${escAttr(d.name)}">${ICONS.poweroff}</button>`:''}
         <button class="act-btn del" title="Borrar" aria-label="Borrar" data-action="delete-device" data-id="${escAttr(d.id)}" data-name="${escAttr(d.name)}">${ICONS.trash}</button>
       </div>
     </div></div>`;
@@ -289,7 +291,7 @@ function buildSwitchRow(d){
 
 function buildLeftContent(d){
   const since=d.online?`${d.since_human} en línea`:`caído hace ${d.since_human}`;
-  if(d.type==='system' && d.cpu_pct!=null){
+  if((d.type==='system'||d.type==='remote_system') && d.cpu_pct!=null){
     const tempColor = d.temp_c==null?'var(--green)':d.temp_c<70?'var(--green)':d.temp_c<90?'var(--amber)':'var(--red)';
     const cpuColor  = d.cpu_pct==null?'var(--green)':d.cpu_pct<70?'var(--green)':d.cpu_pct<90?'var(--amber)':'var(--red)';
     const ramColor  = d.ram_pct==null?'var(--green)':d.ram_pct<70?'var(--green)':d.ram_pct<90?'var(--amber)':'var(--red)';
@@ -306,7 +308,7 @@ function buildLeftContent(d){
 }
 
 function buildRightContent(d){
-  if(d.type==='system' && d.uptime){
+  if((d.type==='system'||d.type==='remote_system') && d.uptime){
     return `<div style="font-family:var(--mono);font-size:10.5px;color:var(--text-dim)"><div>Uptime</div><div style="font-weight:600;color:var(--text);margin-top:2px">${d.uptime}</div></div>`;
   }
   return `${latencyHtml(d.response_ms)}<div class="uptime-pct" id="uptime-pct-${d.id}">…</div>`;
@@ -486,6 +488,16 @@ async function editDevice(id){
 async function confirmDelete(id,name){
   if(!confirm(`¿Borrar "${name}"? Se eliminará también su historial.`))return;
   await fetchApi(`/api/devices/${id}`,{method:'DELETE'});refresh();
+}
+
+async function confirmPoweroff(id, name){
+  if(!confirm(`¿Apagar "${name}"? El equipo se apagará inmediatamente.`))return;
+  const res = await fetchApi(`/api/devices/${id}/poweroff`,{method:'POST'});
+  if(res && res.ok){
+    alert(`Orden de apagado enviada a "${name}".`);
+  } else {
+    alert(`Error al apagar "${name}".`);
+  }
 }
 
 // Toggle AdGuard
@@ -731,6 +743,7 @@ const CLICK_ACTIONS={
   'edit-device':       el=>editDevice(el.dataset.id),
   'toggle-maintenance':el=>toggleMaintenance(el.dataset.id, el.dataset.maintenance==='1'),
   'delete-device':     el=>confirmDelete(el.dataset.id, el.dataset.name),
+  'poweroff-device':   el=>confirmPoweroff(el.dataset.id, el.dataset.name),
   'toggle-docker':     el=>toggleDockerContainerFromHeader(el),
 };
 

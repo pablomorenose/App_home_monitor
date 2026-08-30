@@ -22,6 +22,7 @@ EXPECTED_ROUTES = {
     ("/api/devices/<device_id>", "DELETE"),
     ("/api/devices/<device_id>", "PUT"),
     ("/api/devices/<device_id>/maintenance", "POST"),
+    ("/api/devices/<device_id>/poweroff", "POST"),
     ("/api/export", "GET"),
     ("/api/force-check", "POST"),
     ("/api/groups", "GET"),
