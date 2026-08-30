@@ -213,7 +213,8 @@ network. CI runs it before building the image.
 - All secrets are loaded from environment variables — never hardcoded
 - CSRF tokens required on all POST/PUT/DELETE endpoints
 - Session cookies: HttpOnly, SameSite=Lax, and `Secure` when `SESSION_COOKIE_SECURE=true` (off by default so the dashboard still works over plain HTTP on the LAN)
-- Security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options
+- Security headers: CSP (no inline scripts), HSTS, X-Frame-Options, X-Content-Type-Options
+- All page CSS/JS lives under `/static`; markup uses `data-action` attributes and delegated listeners rather than inline handlers
 - Login rate limiting (5 attempts per 5 minutes per IP; set `TRUSTED_PROXIES` behind a reverse proxy or every client shares one bucket)
 - Login form is CSRF-protected and credentials are compared in constant time
 - Docker: read-only filesystem, no-new-privileges, all capabilities dropped

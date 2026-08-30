@@ -10,79 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
-<style>
-  :root{
-    --accent:#0a84ff;--green:#34c759;--red:#ff3b30;--amber:#ff9500;
-    --surface:#0e0f13;
-    --text:#f5f5f7;--text-dim:#98989d;
-    --card-bg:rgba(255,255,255,.06);
-    --card-ring:rgba(255,255,255,.10);
-    --card-shadow:0 2px 8px rgba(0,0,0,.3),0 8px 28px rgba(0,0,0,.35);
-    --track:rgba(255,255,255,.08);
-    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Inter,sans-serif;
-    --mono:"SF Mono",ui-monospace,"IBM Plex Mono",Consolas,monospace;
-  }
-  [data-theme="light"]{
-    --surface:#f5f6f8;
-    --text:#1c1c1e;--text-dim:#6e6e73;
-    --card-bg:rgba(255,255,255,.82);
-    --card-ring:rgba(0,0,0,.05);
-    --card-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06);
-    --track:rgba(0,0,0,.06);
-  }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{
-    margin:0;background:var(--surface);
-    background-image:
-      radial-gradient(circle at 15% -5%,color-mix(in srgb,var(--accent) 16%,transparent),transparent 45%),
-      radial-gradient(circle at 90% 0%,color-mix(in srgb,var(--accent) 8%,transparent),transparent 40%);
-    color:var(--text);font-family:var(--sans);
-    -webkit-font-smoothing:antialiased;letter-spacing:-.01em;
-    min-height:100dvh;padding:max(24px,env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom));
-    transition:background .3s,color .3s;
-  }
-  .wrap{max-width:520px;margin:0 auto;}
-  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;gap:10px;}
-  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);margin-bottom:2px;}
-  h1{font-size:30px;font-weight:700;margin:0;letter-spacing:-.03em;}
-  .icon-btn{
-    width:38px;height:38px;border-radius:999px;
-    background:var(--card-bg);
-    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-    border:1px solid var(--card-ring);box-shadow:var(--card-shadow);
-    color:var(--text);display:inline-flex;align-items:center;justify-content:center;
-    cursor:pointer;text-decoration:none;transition:transform .12s,opacity .12s;
-  }
-  .icon-btn:active{transform:scale(.88);opacity:.6;}
-  .icon-btn svg{width:19px;height:19px;stroke:currentColor;fill:none;}
-  .filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
-  .filter-btn{
-    font-family:var(--sans);font-size:12px;font-weight:600;padding:8px 14px;
-    border:1px solid var(--card-ring);border-radius:999px;
-    background:var(--card-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-    color:var(--text-dim);cursor:pointer;transition:color .15s,background .15s,transform .12s;
-    box-shadow:var(--card-shadow);
-  }
-  .filter-btn:active{transform:scale(.95);}
-  .filter-btn.active{color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);}
-  .incident-list{display:flex;flex-direction:column;gap:10px;}
-  .incident{
-    display:grid;grid-template-columns:3px 1fr auto;align-items:center;gap:14px;
-    background:var(--card-bg);
-    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-    border:1px solid var(--card-ring);border-radius:18px;
-    box-shadow:var(--card-shadow);padding:14px 16px;overflow:hidden;
-  }
-  .incident-bar{width:3px;height:34px;border-radius:999px;align-self:center;}
-  .incident-bar.down{background:var(--red);}
-  .incident-bar.up{background:var(--green);}
-  .incident-info .name{font-size:15px;font-weight:600;letter-spacing:-.01em;}
-  .incident-info .detail{font-size:12px;color:var(--text-dim);margin-top:3px;}
-  .duration{color:var(--amber);margin-top:1px;font-weight:600;}
-  .incident-meta{text-align:right;font-family:var(--mono);font-size:11px;color:var(--text-dim);font-variant-numeric:tabular-nums;}
-  .empty{text-align:center;font-size:13px;color:var(--text-dim);padding:70px 0;}
-  @media(prefers-reduced-motion:reduce){*{animation:none!important;}}
-</style>
+<link rel="stylesheet" href="/static/css/historial.css">
 </head>
 <body>
 <div class="wrap">
@@ -97,9 +25,9 @@
   </header>
 
   <div class="filter-bar">
-    <button class="filter-btn active" onclick="setFilter('all',this)">Todos</button>
-    <button class="filter-btn" onclick="setFilter('down',this)">Caídas</button>
-    <button class="filter-btn" onclick="setFilter('up',this)">Recuperaciones</button>
+    <button class="filter-btn active" data-action="set-filter" data-filter="all">Todos</button>
+    <button class="filter-btn" data-action="set-filter" data-filter="down">Caídas</button>
+    <button class="filter-btn" data-action="set-filter" data-filter="up">Recuperaciones</button>
   </div>
 
   <div class="incident-list" id="incident-list">
@@ -107,59 +35,6 @@
   </div>
 </div>
 
-<script>
-let allIncidents = [];
-let currentFilter = 'all';
-
-function setFilter(f, btn) {
-  currentFilter = f;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderIncidents();
-}
-
-function renderIncidents() {
-  const list = document.getElementById('incident-list');
-  const filtered = currentFilter === 'all' ? allIncidents
-    : allIncidents.filter(i => currentFilter === 'down' ? !i.online : i.online);
-
-  if (!filtered.length) {
-    list.innerHTML = '<div class="empty">Sin incidencias registradas</div>';
-    return;
-  }
-
-  list.innerHTML = filtered.map(i => {
-    const cls = i.online ? 'up' : 'down';
-    const label = i.online ? 'Recuperado' : 'Caída detectada';
-    const dur = (!i.online && i.duration) ? `<div class="duration">Duración ${i.duration}</div>` : '';
-    return `
-      <div class="incident">
-        <div class="incident-bar ${cls}"></div>
-        <div class="incident-info">
-          <div class="name">${i.name}</div>
-          <div class="detail">${label}</div>
-          ${dur}
-        </div>
-        <div class="incident-meta">${i.ts_human}</div>
-      </div>`;
-  }).join('');
-}
-
-async function load() {
-  try {
-    const res = await fetch('/api/incidents');
-    const data = await res.json();
-    allIncidents = data.incidents;
-    renderIncidents();
-  } catch {
-    document.getElementById('incident-list').innerHTML =
-      '<div class="empty">Error al cargar el historial</div>';
-  }
-}
-
-const t = localStorage.getItem('homem_theme') || 'dark';
-document.documentElement.setAttribute('data-theme', t);
-load();
-</script>
+<script src="/static/js/historial.js" defer></script>
 </body>
 </html>

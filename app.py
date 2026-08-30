@@ -938,10 +938,12 @@ def add_security_headers(response):
     response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
     if APP_ENV == 'production':
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    # CSP: allow inline styles/scripts (existing app uses them), self for everything else
+    # CSP: sin scripts inline — todo el JS vive en /static y los handlers van
+    # por data-action. style-src mantiene 'unsafe-inline' porque el marcado usa
+    # atributos style= (incluidos los que genera el JS al pintar las filas).
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
+        "script-src 'self'; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; "
         "connect-src 'self'; "
