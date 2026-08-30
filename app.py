@@ -41,6 +41,7 @@ from db import (delete_device, get_all_devices, get_all_statuses,
                 get_uptime_and_latency_bulk, get_incidents_bulk)
 from monitor_worker import run_monitor_cycle, start_background_monitor
 from notifications import delete_subscription, init_push_table, save_subscription
+from utils import humanize_duration
 from validators import validate_monitor
 
 # Validar configuración antes de arrancar
@@ -96,19 +97,6 @@ def _get_cached_docker_containers():
         _cache["docker"] = result.get("containers", [])
         _cache["docker_ts"] = now
     return _cache["docker"]
-
-
-def humanize_duration(seconds: float) -> str:
-    seconds = int(seconds)
-    days, rem = divmod(seconds, 86400)
-    hours, rem = divmod(rem, 3600)
-    minutes, secs = divmod(rem, 60)
-    parts = []
-    if days:   parts.append(f"{days}d")
-    if hours:  parts.append(f"{hours}h")
-    if minutes and not days: parts.append(f"{minutes}min")
-    if not parts: parts.append(f"{secs}s")
-    return " ".join(parts)
 
 
 def require_auth():

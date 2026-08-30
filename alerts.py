@@ -7,7 +7,10 @@ Canales soportados:
 - Telegram (via Bot API)
 
 Cada canal se auto-activa cuando sus variables de entorno están configuradas.
-Rate limiting: máximo 1 alerta por monitor cada 5 minutos.
+
+Cuándo notificar NO se decide aquí: es cosa de state_machine.py, que aplica el
+cooldown sobre device_status.last_notification_ts y por tanto sobrevive a los
+reinicios. Este módulo solo entrega lo que le llega.
 """
 
 import hashlib
@@ -31,10 +34,6 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
-
-# Rate limiting: max 1 alert per monitor per 5 minutes
-_RATE_LIMIT_SECONDS = 300
-_rate_limit_cache: dict[str, float] = {}
 
 # ────────────────────────────────────────────────────────────────────
 # Alert templates
@@ -221,24 +220,6 @@ def get_enabled_channels() -> list[NotificationChannel]:
 
 
 # ────────────────────────────────────────────────────────────────────
-# Rate limiting
-# ────────────────────────────────────────────────────────────────────
-
-def _is_rate_limited(monitor_id: str) -> bool:
-    """Check if a monitor is rate-limited (max 1 alert per 5 min)."""
-    now = time.time()
-    last_sent = _rate_limit_cache.get(monitor_id, 0)
-    if (now - last_sent) < _RATE_LIMIT_SECONDS:
-        return True
-    return False
-
-
-def _update_rate_limit(monitor_id: str):
-    """Record that an alert was sent for this monitor."""
-    _rate_limit_cache[monitor_id] = time.time()
-
-
-# ────────────────────────────────────────────────────────────────────
 # Main public API
 # ────────────────────────────────────────────────────────────────────
 
@@ -260,11 +241,6 @@ def send_alert(event_type: str, monitor: dict, details: dict) -> bool:
     """
     monitor_id = monitor.get("id", "unknown")
 
-    # Rate limiting check
-    if _is_rate_limited(monitor_id):
-        logger.debug("Alert rate-limited for monitor %s", monitor_id)
-        return False
-
     # Get enabled channels
     enabled = get_enabled_channels()
     if not enabled:
@@ -284,8 +260,7 @@ def send_alert(event_type: str, monitor: dict, details: dict) -> bool:
         except Exception as e:
             logger.error("Error sending via %s: %s", channel.__class__.__name__, e)
 
-    # Update rate limit only if at least one channel succeeded
-    if any_success:
-        _update_rate_limit(monitor_id)
+    if not any_success:
+        logger.warning("Ningún canal pudo entregar la alerta de %s", monitor_id)
 
     return any_success

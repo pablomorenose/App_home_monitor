@@ -11,7 +11,8 @@ import time
 import uuid
 
 
-# Default cooldown between notifications (seconds)
+# Cooldown entre avisos de caída del mismo monitor (segundos).
+# No se aplica a las recuperaciones: ver más abajo.
 NOTIFICATION_COOLDOWN = 300
 
 
@@ -120,7 +121,10 @@ def process_check_result(monitor: dict, check_result: dict,
             if new_successes >= recovery_threshold:
                 was_down = prev_state == "down"
                 new_state = "up"
-                if was_down and _can_notify(prev_notification_ts, now):
+                # Sin cooldown: solo hay una recuperación por incidente, así que
+                # no puede causar una tormenta, y silenciarla dejaba al usuario
+                # con un aviso de caída sin cierre cuando el fallo duraba poco.
+                if was_down:
                     should_notify_recovery = True
                 # Clear incident on recovery
                 incident_id = None

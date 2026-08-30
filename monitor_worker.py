@@ -36,6 +36,7 @@ from db import (
     update_monitor_status,
 )
 from state_machine import process_check_result
+from utils import humanize_duration
 
 logger = logging.getLogger("monitor_worker")
 
@@ -187,7 +188,7 @@ def run_monitor_cycle(force: bool = False):
                         status = status_by_id.get(monitor["id"], {})
                         last_change = float(status.get("last_change_ts", 0))
                         duration_secs = time.time() - last_change if last_change else 0
-                        duration_str = _humanize_duration(duration_secs)
+                        duration_str = humanize_duration(duration_secs)
                         send_alert("recovery", monitor, {
                             "duration": duration_str,
                             "state": "up",
@@ -213,26 +214,6 @@ def run_monitor_cycle(force: bool = False):
             )
     finally:
         _cycle_lock.release()
-
-
-def _humanize_duration(seconds: float) -> str:
-    """Format seconds into a human-readable duration string."""
-    seconds = int(seconds)
-    if seconds < 60:
-        return f"{seconds}s"
-    days, rem = divmod(seconds, 86400)
-    hours, rem = divmod(rem, 3600)
-    minutes, _ = divmod(rem, 60)
-    parts = []
-    if days:
-        parts.append(f"{days}d")
-    if hours:
-        parts.append(f"{hours}h")
-    if minutes and not days:
-        parts.append(f"{minutes}min")
-    if not parts:
-        parts.append(f"{seconds}s")
-    return " ".join(parts)
 
 
 def _notify_change(name: str, online: bool, error: str | None):

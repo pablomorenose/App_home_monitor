@@ -28,7 +28,7 @@ Each monitor transitions through: `pending` → `up` / `down` / `degraded` / `ma
 - **Web Push** — Browser push notifications via VAPID/Web Push
 - **Telegram** — Bot notifications (planned)
 - **Webhook** — POST to any URL on state change
-- Rate limiting to prevent alert storms
+- Cooldown between repeated down alerts for the same monitor (recoveries are always delivered)
 
 ### History & Stats
 - State + message recorded in history
