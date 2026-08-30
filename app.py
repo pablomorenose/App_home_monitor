@@ -24,13 +24,14 @@ from collections import defaultdict
 import time as _time
 
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import (
     SECRET_KEY, ACCESS_PASSWORD, ADMIN_USERNAME, VAPID_PUBLIC_KEY, APP_ENV, PUSH_ENABLED,
-    DOCKER_METRICS_ENABLED, STATUS_PAGE_ENABLED, SESSION_COOKIE_SECURE, APP_VERSION,
-    validate_config,
+    DOCKER_METRICS_ENABLED, STATUS_PAGE_ENABLED, SESSION_COOKIE_SECURE, TRUSTED_PROXIES,
+    APP_VERSION, validate_config,
 )
-from csrf import get_csrf_token, csrf_protect
+from csrf import get_csrf_token, csrf_protect, secure_eq
 from db import (delete_device, get_all_devices, get_all_statuses,
                 init_db, seed_devices_from_config, upsert_device, get_latency_history,
                 get_incidents, get_all_monitors, get_monitor, upsert_monitor,
@@ -52,6 +53,14 @@ app.config.update(
     SESSION_COOKIE_SECURE=SESSION_COOKIE_SECURE,  # ver config.py
     PERMANENT_SESSION_LIFETIME=30 * 24 * 3600,  # 30 days
 )
+
+# Detrás de nginx o Tailscale Funnel, request.remote_addr es la IP del proxy y
+# el rate limit de login se aplicaría a todo el mundo a la vez. Solo se confía
+# en X-Forwarded-For si TRUSTED_PROXIES > 0: activarlo sin un proxy delante
+# permitiría falsificar la cabecera y saltarse el límite.
+if TRUSTED_PROXIES > 0:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=TRUSTED_PROXIES,
+                            x_proto=TRUSTED_PROXIES, x_host=TRUSTED_PROXIES)
 
 
 # ─── Metrics cache (avoid slow calls on every /api/status request) ───
@@ -119,6 +128,11 @@ LOGIN_RATE_WINDOW = 300  # 5 minutes
 
 def _check_login_rate(ip):
     now = _time.time()
+    # Purgar IPs cuya ventana ya expiró: si no, el dict crece sin límite.
+    for other in [k for k, v in _login_attempts.items()
+                  if k != ip and (not v or now - v[-1] >= LOGIN_RATE_WINDOW)]:
+        del _login_attempts[other]
+
     _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < LOGIN_RATE_WINDOW]
     if len(_login_attempts[ip]) >= LOGIN_RATE_LIMIT:
         return False
@@ -134,16 +148,32 @@ def _check_login_rate(ip):
 def login():
     error = None
     if request.method == "POST":
+        # CSRF también en el login: sin esto, un tercero puede forzar una sesión
+        # conocida por él en el navegador de la víctima (login CSRF).
+        form_token = request.form.get("csrf_token", "")
+        if not form_token or not secure_eq(form_token, session.get("_csrf_token", "")):
+            return render_template(
+                "login.html", csrf_token=get_csrf_token(),
+                error="La sesión ha caducado. Inténtalo de nuevo."), 400
+
         if not _check_login_rate(request.remote_addr):
-            return render_template("login.html", error="Demasiados intentos. Espera 5 minutos."), 429
-        if request.form.get("username") == ADMIN_USERNAME and request.form.get("password") == ACCESS_PASSWORD:
+            return render_template(
+                "login.html", csrf_token=get_csrf_token(),
+                error="Demasiados intentos. Espera 5 minutos."), 429
+
+        # compare_digest evita filtrar la contraseña por tiempo de respuesta.
+        # Se evalúan siempre las dos comparaciones para no distinguir "usuario
+        # incorrecto" de "contraseña incorrecta" por la duración del check.
+        user_ok = secure_eq(request.form.get("username", ""), ADMIN_USERNAME)
+        pass_ok = secure_eq(request.form.get("password", ""), ACCESS_PASSWORD)
+        if user_ok and pass_ok:
             session.clear()
             session.permanent = True
             session["authenticated"] = True
             get_csrf_token()  # regenerate CSRF token on login
             return redirect(url_for("index"))
         error = "Usuario o contraseña incorrectos"
-    return render_template("login.html", error=error)
+    return render_template("login.html", csrf_token=get_csrf_token(), error=error)
 
 
 @app.route("/logout")
@@ -797,7 +827,7 @@ def api_heartbeat(monitor_id):
     logs del proxy) o por ?token= para clientes simples tipo curl.
     """
     token = request.headers.get("X-Heartbeat-Token") or request.args.get("token", "")
-    if not hmac.compare_digest(token, heartbeat_token(monitor_id)):
+    if not secure_eq(token, heartbeat_token(monitor_id)):
         return jsonify({"error": "Token inválido"}), 403
     if not update_heartbeat_ts(monitor_id):
         return jsonify({"error": "Monitor no encontrado"}), 404

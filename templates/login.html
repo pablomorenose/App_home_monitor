@@ -82,6 +82,7 @@
   <div class="error">{{ error }}</div>
   {% endif %}
   <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="form-group">
       <label>Usuario</label>
       <input type="text" name="username" autofocus placeholder="admin" autocomplete="username">

@@ -105,6 +105,7 @@ docker compose up -d
 | `TZ` | No | `Europe/Madrid` | Timezone |
 | `ALLOW_INSECURE_NO_AUTH` | No | `false` | Dev only: allow no password. Refused when `APP_ENV=production` |
 | `SESSION_COOKIE_SECURE` | No | `false` | Set `Secure` on the session cookie (turn on if you only use HTTPS) |
+| `TRUSTED_PROXIES` | No | `0` | Number of trusted reverse proxies; enables `X-Forwarded-For` so login rate limiting sees the real client IP |
 | `HISTORY_RETENTION_DAYS` | No | `30` | Days to retain history data |
 
 ## API Endpoints
@@ -191,7 +192,8 @@ docker compose up -d
 - CSRF tokens required on all POST/PUT/DELETE endpoints
 - Session cookies: HttpOnly, SameSite=Lax, and `Secure` when `SESSION_COOKIE_SECURE=true` (off by default so the dashboard still works over plain HTTP on the LAN)
 - Security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options
-- Login rate limiting (5 attempts per 5 minutes per IP)
+- Login rate limiting (5 attempts per 5 minutes per IP; set `TRUSTED_PROXIES` behind a reverse proxy or every client shares one bucket)
+- Login form is CSRF-protected and credentials are compared in constant time
 - Docker: read-only filesystem, no-new-privileges, all capabilities dropped
 - Non-root user inside container
 - DB connections use SSL (`sslmode=require`)

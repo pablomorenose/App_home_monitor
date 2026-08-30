@@ -45,6 +45,10 @@ ALLOW_INSECURE_NO_AUTH = os.getenv("ALLOW_INSECURE_NO_AUTH", "false").lower() ==
 # Ponlo a true si solo entras por HTTPS (p. ej. solo Tailscale Funnel).
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
 
+# Nº de proxies de confianza delante de la app (nginx, Tailscale Funnel...).
+# 0 = ninguno: se ignora X-Forwarded-For y se usa la IP de la conexión.
+TRUSTED_PROXIES = int(os.getenv("TRUSTED_PROXIES", "0"))
+
 # ────────────────────────────────────────────────────────────────────
 # BASE DE DATOS
 # ────────────────────────────────────────────────────────────────────
