@@ -121,10 +121,10 @@ def run_monitor_cycle(force: bool = False):
             monitor_id = monitor["id"]
             current_status = status_by_id.get(monitor_id, {})
 
-            # For heartbeat type, inject last_check_ts so the check knows when
-            # the last ping was received
+            # For heartbeat type, inject the timestamp of the last received ping
             if monitor.get("type") == "heartbeat":
-                monitor["_last_check_ts"] = float(current_status.get("last_check_ts", 0))
+                monitor["_last_heartbeat_ts"] = float(
+                    current_status.get("last_heartbeat_ts") or 0)
 
             # Run the actual check
             result = check_monitor(monitor)

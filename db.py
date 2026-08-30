@@ -118,6 +118,9 @@ def init_db():
             cur.execute("ALTER TABLE device_status ADD COLUMN IF NOT EXISTS consecutive_successes INTEGER NOT NULL DEFAULT 0")
             cur.execute("ALTER TABLE device_status ADD COLUMN IF NOT EXISTS last_notification_ts DOUBLE PRECISION NOT NULL DEFAULT 0")
             cur.execute("ALTER TABLE device_status ADD COLUMN IF NOT EXISTS incident_id TEXT")
+            # Momento del último ping recibido en monitores 'heartbeat'. Debe ir
+            # aparte de last_check_ts, que el worker refresca en cada ciclo.
+            cur.execute("ALTER TABLE device_status ADD COLUMN IF NOT EXISTS last_heartbeat_ts DOUBLE PRECISION NOT NULL DEFAULT 0")
 
             # ─── Índices ───
             # status_history crece ~1 fila por check y monitor (decenas de miles
@@ -692,7 +695,7 @@ def get_monitor_statuses() -> list[dict]:
                 SELECT device_id, name, online, last_change_ts, last_check_ts,
                        last_error, response_ms, switch_state,
                        state, consecutive_failures, consecutive_successes,
-                       last_notification_ts, incident_id
+                       last_notification_ts, incident_id, last_heartbeat_ts
                 FROM device_status
             """)
             return [dict(row) for row in cur.fetchall()]
@@ -765,7 +768,7 @@ def update_heartbeat_ts(monitor_id: str) -> bool:
                 return False
             cur.execute("""
                 UPDATE device_status
-                SET last_check_ts = %s
+                SET last_heartbeat_ts = %s
                 WHERE device_id = %s
             """, (now, monitor_id))
             # If no row exists yet, create one
@@ -775,10 +778,10 @@ def update_heartbeat_ts(monitor_id: str) -> bool:
                     (device_id, name, online, last_change_ts, last_check_ts,
                      last_error, response_ms, switch_state, state,
                      consecutive_failures, consecutive_successes,
-                     last_notification_ts, incident_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     last_notification_ts, incident_id, last_heartbeat_ts)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (monitor_id, monitor_id, 1, now, now, None, None, None,
-                      'up', 0, 1, 0, None))
+                      'up', 0, 1, 0, None, now))
     return True
 
 

@@ -569,18 +569,21 @@ def check_docker(monitor: dict) -> dict:
 # ───────────────────────────────────────────────────────────────────
 
 def check_heartbeat(monitor_id: str, check_interval: int = 15,
-                    last_check_ts: float = 0) -> dict:
+                    last_heartbeat_ts: float = 0) -> dict:
     """
     Check if last heartbeat ping is within expected interval.
-    The heartbeat is considered overdue if last_check_ts is older than
+    The heartbeat is considered overdue if last_heartbeat_ts is older than
     2x check_interval seconds.
+
+    Ojo: debe mirar last_heartbeat_ts (el ping recibido), no last_check_ts,
+    que el worker refresca en cada ciclo — con eso el monitor jamás caía.
     """
     now = time.time()
-    if last_check_ts == 0:
+    if last_heartbeat_ts == 0:
         return _make_result("down", "Nunca se recibió un heartbeat",
                             last_ping_ago=None)
 
-    seconds_ago = now - last_check_ts
+    seconds_ago = now - last_heartbeat_ts
     max_allowed = check_interval * 2  # Allow 2x the interval before marking down
 
     if seconds_ago > max_allowed:
@@ -789,7 +792,7 @@ def check_monitor(monitor: dict) -> dict:
         return check_heartbeat(
             monitor_id=monitor.get("id", ""),
             check_interval=int(monitor.get("check_interval", 15)),
-            last_check_ts=float(monitor.get("_last_check_ts", 0)),
+            last_heartbeat_ts=float(monitor.get("_last_heartbeat_ts", 0)),
         )
 
     return _make_result("down", f"Tipo de monitor desconocido: {mtype}")
