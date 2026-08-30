@@ -7,7 +7,7 @@ Compatible con fetch() / XHR enviando el header X-CSRF-Token.
 import hmac
 import secrets
 import functools
-from flask import session, request, jsonify, abort
+from flask import session, request, abort
 
 
 def secure_eq(a: str, b: str) -> bool:

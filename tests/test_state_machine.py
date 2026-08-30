@@ -6,8 +6,6 @@ el estado de entrada y comprobar la transición exacta.
 
 import time
 
-import pytest
-
 from state_machine import NOTIFICATION_COOLDOWN, process_check_result
 
 

@@ -10,3 +10,6 @@ monitores y escribiendo el mismo historial.
 from app import app, bootstrap
 
 bootstrap()
+
+# `app` es el callable WSGI que gunicorn resuelve en "wsgi:app".
+__all__ = ["app"]

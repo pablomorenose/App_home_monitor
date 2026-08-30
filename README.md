@@ -205,9 +205,10 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-The suite covers the pure logic: state transitions, monitor validation,
-incident extraction and the check helpers. It needs no database and no
-network. CI runs it before building the image.
+The suite covers the pure logic — state transitions, monitor validation,
+incident extraction, the check helpers — plus the HTTP route contract. It
+needs no database and no network. CI runs `pyflakes` and the tests before
+building the image.
 
 ## Security Notes
 

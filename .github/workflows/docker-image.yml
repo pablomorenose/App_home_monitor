@@ -18,6 +18,8 @@ jobs:
         cache: pip
     - name: Install dependencies
       run: pip install -r requirements-dev.txt
+    - name: Check for undefined and unused names
+      run: pyflakes *.py routes/*.py tests/*.py
     - name: Run tests
       run: pytest -q
 

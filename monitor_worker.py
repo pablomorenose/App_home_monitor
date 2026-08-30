@@ -24,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from alerts import send_alert
 from checks import check_device, check_monitor
-from config import CHECK_INTERVAL_SECONDS, MAX_CHECK_WORKERS, PUSH_ENABLED
+from config import CHECK_INTERVAL_SECONDS, MAX_CHECK_WORKERS
 from db import (
     get_all_devices,
     get_all_statuses,

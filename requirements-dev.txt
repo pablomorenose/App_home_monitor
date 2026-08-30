@@ -1,3 +1,4 @@
 # Dependencias solo para desarrollo y CI.
 -r requirements.txt
 pytest>=8.4,<9
+pyflakes>=3.2,<4

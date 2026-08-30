@@ -243,7 +243,6 @@ def api_heartbeats(device_id):
 def api_incidents():
     if require_auth(): return jsonify({"error": "No autorizado"}), 401
     incidents = get_incidents(limit=100)
-    now = time.time()
     result = []
     for i in incidents:
         duration = None

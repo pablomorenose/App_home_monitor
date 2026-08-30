@@ -13,7 +13,7 @@ import time
 import psycopg2.extras
 from pywebpush import webpush, WebPushException
 
-from config import VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VAPID_CLAIMS_EMAIL
+from config import VAPID_PRIVATE_KEY, VAPID_CLAIMS_EMAIL
 from db import get_db
 
 
