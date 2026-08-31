@@ -1,6 +1,7 @@
 """API de dispositivos: estado, historial corto y acciones sobre uno."""
 
 import json
+import threading
 import time
 from urllib.parse import urlparse
 
@@ -18,72 +19,78 @@ from utils import humanize_duration
 bp = Blueprint("devices", __name__)
 
 
-# ─── Metrics cache (avoid slow calls on every /api/status request) ───
-_cache = {"system": {}, "system_ts": 0, "docker": [], "docker_ts": 0,
-          "remote_system": {}}
-_CACHE_TTL = 10  # seconds
-_REMOTE_CACHE_TTL = 15  # seconds — same as check interval
+# ─── Caché de métricas, refrescada fuera de la petición ───
+# Recolectar métricas cuesta segundos: los stats de Docker rondan los 2s
+# incluso en paralelo, y un agente remoto apagado agota su timeout de 8s.
+# /api/status se pide cada 15s desde cada pestaña abierta, así que hacerlo
+# dentro de la petición dejaba el dashboard esperando en CADA refresco.
+# Aquí se sirve siempre el último valor conocido y se refresca en un hilo.
+_cache: dict = {}                 # clave -> {"value": ..., "ts": float}
+_cache_lock = threading.Lock()
+_refreshing: set = set()          # claves con un refresco ya en marcha
+
+_SYSTEM_TTL = 10
+_DOCKER_TTL = 20
+_REMOTE_TTL = 15
 
 
-def _get_cached_remote_system_metrics(device_id: str, url: str, timeout: int = 8) -> dict:
-    """Fetch and cache remote system metrics from metrics_agent HTTP endpoint."""
+def _refresh_entry(key, producer):
+    value = None
+    try:
+        value = producer()
+    except Exception:
+        pass
+    with _cache_lock:
+        entry = _cache.setdefault(key, {"value": None, "ts": 0})
+        if value is not None:
+            entry["value"] = value
+        # Se marca el ts aunque falle, para no reintentar en cada petición.
+        entry["ts"] = time.time()
+        _refreshing.discard(key)
+
+
+def _cached(key, ttl, producer, default):
+    """Devuelve el valor cacheado al instante y lo refresca en segundo plano."""
     now = time.time()
-    cached = _cache["remote_system"].get(device_id, {})
-    if now - cached.get("_ts", 0) > _REMOTE_CACHE_TTL:
-        try:
-            from checks import check_remote_system
-            result = check_remote_system(url=url, timeout=timeout)
-            details = result.get("details", {})
-            data = {
-                "cpu_pct":      details.get("cpu_pct"),
-                "ram_pct":      details.get("ram_pct"),
-                "ram_total_mb": details.get("ram_total_mb"),
-                "ram_used_mb":  details.get("ram_used_mb"),
-                "temp_c":       details.get("temp_c"),
-                "disk_pct":     details.get("disk_pct"),
-                "disk_total_gb":details.get("disk_total_gb"),
-                "disk_used_gb": details.get("disk_used_gb"),
-                "uptime":       details.get("uptime"),
-                "_ts":          now,
-            }
-        except Exception:
-            data = cached  # keep old data on error
-            data["_ts"] = now
-        _cache["remote_system"][device_id] = data
-    result = dict(_cache["remote_system"].get(device_id, {}))
-    result.pop("_ts", None)
-    return result
+    with _cache_lock:
+        entry = _cache.get(key)
+        stale = entry is None or (now - entry["ts"]) >= ttl
+        launch = stale and key not in _refreshing
+        if launch:
+            _refreshing.add(key)
+        value = entry["value"] if entry and entry["value"] is not None else default
+    if launch:
+        threading.Thread(target=_refresh_entry, args=(key, producer),
+                         daemon=True).start()
+    return value
+
+
+_METRIC_KEYS = ("cpu_pct", "ram_pct", "ram_total_mb", "ram_used_mb", "temp_c",
+                "disk_pct", "disk_total_gb", "disk_used_gb", "uptime")
 
 
 def _get_cached_system_metrics():
-    now = time.time()
-    if now - _cache["system_ts"] > _CACHE_TTL:
+    def produce():
         from checks import check_system
-        result = check_system(timeout=5)
-        details = result.get("details", {})
-        _cache["system"] = {
-            "cpu_pct": details.get("cpu_pct"),
-            "ram_pct": details.get("ram_pct"),
-            "ram_total_mb": details.get("ram_total_mb"),
-            "ram_used_mb": details.get("ram_used_mb"),
-            "temp_c": details.get("temp_c"),
-            "disk_pct": details.get("disk_pct"),
-            "disk_total_gb": details.get("disk_total_gb"),
-            "disk_used_gb": details.get("disk_used_gb"),
-            "uptime": details.get("uptime"),
-        }
-        _cache["system_ts"] = now
-    return _cache["system"]
+        details = check_system(timeout=5).get("details", {})
+        return {k: details.get(k) for k in _METRIC_KEYS}
+    return _cached("system", _SYSTEM_TTL, produce, {})
 
 
 def _get_cached_docker_containers():
-    now = time.time()
-    if now - _cache["docker_ts"] > _CACHE_TTL:
+    def produce():
         from checks import get_all_docker_containers
-        result = get_all_docker_containers(timeout=5)
-        _cache["docker"] = result.get("containers", [])
-        _cache["docker_ts"] = now
-    return _cache["docker"]
+        return get_all_docker_containers(timeout=5).get("containers", [])
+    return _cached("docker", _DOCKER_TTL, produce, [])
+
+
+def _get_cached_remote_system_metrics(device_id: str, url: str, timeout: int = 8) -> dict:
+    """Métricas de una máquina remota vía el endpoint HTTP de metrics_agent."""
+    def produce():
+        from checks import check_remote_system
+        details = check_remote_system(url=url, timeout=timeout).get("details", {})
+        return {k: details.get(k) for k in _METRIC_KEYS}
+    return _cached(f"remote:{device_id}", _REMOTE_TTL, produce, {})
 
 
 @bp.route("/api/force-check", methods=["POST"])

@@ -18,6 +18,7 @@ import socket
 import ssl
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -477,6 +478,33 @@ def get_all_docker_containers(timeout: int = 5) -> dict:
         running_count = 0
         total_count = len(all_containers)
 
+        def _stats_for(cid, container_info):
+            """Rellena cpu/mem/net de un contenedor en marcha."""
+            try:
+                stats = _docker_socket_get(f"/containers/{cid}/stats?stream=false", timeout=timeout)
+                # CPU
+                cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - stats["precpu_stats"]["cpu_usage"]["total_usage"]
+                sys_delta = stats["cpu_stats"].get("system_cpu_usage", 0) - stats["precpu_stats"].get("system_cpu_usage", 0)
+                if sys_delta > 0:
+                    cpu_pct = min(round((cpu_delta / sys_delta) * 100, 1), 100.0)
+                else:
+                    cpu_pct = 0.0
+                container_info["cpu"] = f"{cpu_pct}%"
+
+                # Memory
+                mem_usage = stats["memory_stats"].get("usage", 0) - stats["memory_stats"].get("stats", {}).get("cache", 0)
+                container_info["mem"] = f"{round(mem_usage / 1048576, 1)}MB"
+
+                # Network
+                net_rx = sum(v["rx_bytes"] for v in stats.get("networks", {}).values())
+                net_tx = sum(v["tx_bytes"] for v in stats.get("networks", {}).values())
+                container_info["net"] = f"↓{_fmt_bytes(net_rx)} ↑{_fmt_bytes(net_tx)}"
+            except Exception:
+                container_info["cpu"] = "n/a"
+                container_info["mem"] = "n/a"
+                container_info["net"] = "n/a"
+
+        pending = []
         for c in all_containers:
             cid = c["Id"]
             name = c["Names"][0].lstrip("/") if c.get("Names") else cid[:12]
@@ -494,32 +522,15 @@ def get_all_docker_containers(timeout: int = 5) -> dict:
 
             if status == "running":
                 running_count += 1
-                # Get stats for running containers
-                try:
-                    stats = _docker_socket_get(f"/containers/{cid}/stats?stream=false", timeout=timeout)
-                    # CPU
-                    cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - stats["precpu_stats"]["cpu_usage"]["total_usage"]
-                    sys_delta = stats["cpu_stats"].get("system_cpu_usage", 0) - stats["precpu_stats"].get("system_cpu_usage", 0)
-                    if sys_delta > 0:
-                        cpu_pct = min(round((cpu_delta / sys_delta) * 100, 1), 100.0)
-                    else:
-                        cpu_pct = 0.0
-                    container_info["cpu"] = f"{cpu_pct}%"
-
-                    # Memory
-                    mem_usage = stats["memory_stats"].get("usage", 0) - stats["memory_stats"].get("stats", {}).get("cache", 0)
-                    container_info["mem"] = f"{round(mem_usage / 1048576, 1)}MB"
-
-                    # Network
-                    net_rx = sum(v["rx_bytes"] for v in stats.get("networks", {}).values())
-                    net_tx = sum(v["tx_bytes"] for v in stats.get("networks", {}).values())
-                    container_info["net"] = f"↓{_fmt_bytes(net_rx)} ↑{_fmt_bytes(net_tx)}"
-                except Exception:
-                    container_info["cpu"] = "n/a"
-                    container_info["mem"] = "n/a"
-                    container_info["net"] = "n/a"
+                pending.append((cid, container_info))
 
             containers.append(container_info)
+
+        # /containers/<id>/stats?stream=false tarda ~2s: Docker necesita dos
+        # muestras para el delta de CPU. En serie eso son 11s con 6 contenedores.
+        if pending:
+            with ThreadPoolExecutor(max_workers=min(len(pending), 8)) as ex:
+                list(ex.map(lambda args: _stats_for(*args), pending))
 
         # Sort: running first, then alphabetical
         containers.sort(key=lambda x: (0 if x["state"] == "running" else 1, x["name"].lower()))
