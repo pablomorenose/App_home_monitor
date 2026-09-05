@@ -189,7 +189,13 @@ def get_all_devices() -> list[dict]:
     """Devuelve todos los dispositivos configurados."""
     with get_db() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT id, name, type, config_json, enabled, created_at, COALESCE(maintenance_until, 0) as maintenance_until FROM devices WHERE enabled = 1 ORDER BY created_at")
+            cur.execute(
+                "SELECT id, name, type, config_json, enabled, created_at, "
+                "COALESCE(maintenance_until, 0) AS maintenance_until, "
+                # depends_on es columna propia (no vive en config_json) y la
+                # necesita el diagrama de dependencias además del worker.
+                "COALESCE(depends_on, '') AS depends_on "
+                "FROM devices WHERE enabled = 1 ORDER BY created_at")
             rows = cur.fetchall()
             result = []
             for row in rows:
@@ -201,25 +207,32 @@ def get_all_devices() -> list[dict]:
 
 def upsert_device(device: dict):
     """Crea o actualiza un dispositivo."""
-    # Separar campos de la tabla de los campos de configuración
-    base_fields = {"id", "name", "type", "enabled", "created_at"}
+    # Separar campos de la tabla de los campos de configuración.
+    # depends_on va en su columna (no en config_json) para que coincida con lo
+    # que escribe upsert_monitor: al leer, config_json pisa a las columnas, así
+    # que tenerlo en los dos sitios acabaría dando valores distintos según por
+    # qué endpoint se hubiera guardado.
+    base_fields = {"id", "name", "type", "enabled", "created_at", "depends_on"}
     config = {k: v for k, v in device.items() if k not in base_fields}
     now = time.time()
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO devices (id, name, type, config_json, enabled, created_at)
-                VALUES (%s, %s, %s, %s, 1, %s)
+                INSERT INTO devices (id, name, type, config_json, enabled,
+                                     created_at, depends_on)
+                VALUES (%s, %s, %s, %s, 1, %s, %s)
                 ON CONFLICT (id) DO UPDATE
                 SET name = EXCLUDED.name,
                     type = EXCLUDED.type,
-                    config_json = EXCLUDED.config_json
+                    config_json = EXCLUDED.config_json,
+                    depends_on = EXCLUDED.depends_on
             """, (
                 device["id"],
                 device["name"],
                 device["type"],
                 json.dumps(config),
                 device.get("created_at", now),
+                device.get("depends_on", "") or "",
             ))
 
 

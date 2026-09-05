@@ -28,6 +28,20 @@ def test_tipo_desconocido():
     assert "type:" in errors_for(type="carrier_pigeon")
 
 
+def test_depends_on_no_puede_apuntar_a_si_mismo():
+    """Un ciclo de longitud 1 dejaría al monitor colgando de sí mismo."""
+    assert "depends_on:" in errors_for(depends_on="web1")   # el id es web1
+
+
+def test_depends_on_acepta_otro_monitor_y_vacio():
+    assert errors_for(depends_on="raspberry_pi") == ""
+    assert errors_for(depends_on="") == ""
+
+
+def test_depends_on_rechaza_un_id_invalido():
+    assert "depends_on:" in errors_for(depends_on="../etc/passwd")
+
+
 def test_remote_system_es_un_tipo_valido():
     assert validate_monitor({"id": "pc", "name": "PC", "type": "remote_system"}) == []
 

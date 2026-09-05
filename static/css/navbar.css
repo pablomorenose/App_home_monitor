@@ -1,0 +1,35 @@
+/* La barra se usa en las tres páginas; historial.css no define
+   --text-tertiary, así que la barra trae sus propios tonos. */
+:root{
+  --tabbar-bg:rgba(20,21,26,.82);
+  --tabbar-idle:#7c7c82;
+}
+[data-theme="light"]{
+  --tabbar-bg:rgba(255,255,255,.88);
+  --tabbar-idle:#8e8e93;
+}
+
+/* ─────────── Barra de navegación inferior (estilo iOS tab bar) ─────────── */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:90;
+  display:flex;justify-content:space-around;align-items:stretch;
+  background:var(--tabbar-bg);
+  border-top:1px solid var(--card-ring);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.tabbar a{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;padding:8px 4px 6px;text-decoration:none;
+  color:var(--tabbar-idle);font-family:var(--sans);
+  font-size:10px;font-weight:600;letter-spacing:.02em;
+  -webkit-tap-highlight-color:transparent;transition:color .15s;
+}
+.tabbar a.active{color:var(--accent);}
+.tabbar a:active{opacity:.6;}
+.tabbar svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;}
+.tabbar a.active svg{stroke-width:2;}
+
+/* Hueco para que la barra no tape el final del contenido */
+body{padding-bottom:calc(58px + env(safe-area-inset-bottom));}

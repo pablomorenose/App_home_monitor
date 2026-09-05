@@ -69,6 +69,14 @@ def validate_monitor(data: dict) -> list[str]:
             except (ValueError, TypeError):
                 errors.append("port: debe ser un número entero.")
 
+    # --- depends_on ---
+    depends_on = data.get("depends_on")
+    if depends_on:
+        if not _ID_PATTERN.match(str(depends_on)):
+            errors.append("depends_on: id de monitor inválido.")
+        elif str(depends_on) == str(mid):
+            errors.append("depends_on: un monitor no puede depender de sí mismo.")
+
     # --- timeout (1-60) ---
     timeout = data.get("timeout")
     if timeout is not None:

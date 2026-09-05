@@ -425,8 +425,23 @@ function updateFields(){
   else if(t==='heartbeat'){document.getElementById('fields-heartbeat').style.display='';}
   // 'system' type needs no extra fields
 }
+// Rellena el desplegable "Depende de" con el resto de monitores. Esta relación
+// alimenta el diagrama (/diagrama) y también silencia las alertas de un hijo
+// cuando su padre está caído.
+async function fillDependsSelect(currentId, selected){
+  const sel=document.getElementById('f-depends');
+  if(!sel)return;
+  let devs=[];
+  try{ devs=await(await fetch('/api/devices')).json(); }catch{}
+  sel.innerHTML='<option value="">— Ninguna —</option>'+
+    devs.filter(d=>d.id!==currentId)
+        .map(d=>`<option value="${escAttr(d.id)}">${escAttr(d.name)}</option>`).join('');
+  sel.value=selected||'';
+}
+
 function openModal(device){
   editingId=device?device.id:null;
+  fillDependsSelect(device?.id, device?.depends_on);
   document.getElementById('modal-title').textContent=device?'Editar dispositivo':'Añadir dispositivo';
   document.getElementById('f-name').value=device?.name||'';
   document.getElementById('f-id').value=device?.id||'';
@@ -463,7 +478,8 @@ async function saveDevice(){
   const check_interval=parseInt(document.getElementById('f-check-interval').value)||60;
   const max_retries=parseInt(document.getElementById('f-max-retries').value)||3;
   if(!name||!id){alert('Nombre e ID son obligatorios');return;}
-  const device={id,name,type,timeout,check_interval,max_retries};
+  const depends_on=document.getElementById('f-depends')?.value||'';
+  const device={id,name,type,timeout,check_interval,max_retries,depends_on};
   if(type==='http'){
     device.url=document.getElementById('f-url').value.trim();
     device.http_method=document.getElementById('f-http-method').value;

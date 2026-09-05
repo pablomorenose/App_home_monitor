@@ -200,6 +200,8 @@ def api_status():
             "maintenance_until": maintenance_until,
             "in_maintenance": in_maintenance,
             "switch_state": s.get("switch_state"),
+            # Para el diagrama de dependencias (/diagrama)
+            "depends_on": cfg.get("depends_on", "") or "",
         }
 
         # Include system metrics inline for 'system' type monitors (cached)

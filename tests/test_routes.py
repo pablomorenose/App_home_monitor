@@ -13,6 +13,7 @@ EXPECTED_ROUTES = {
     ("/", "GET"),
     ("/health", "GET"),
     ("/historial", "GET"),
+    ("/diagrama", "GET"),
     ("/login", "GET,POST"),
     ("/logout", "GET"),
     ("/static/<path:filename>", "GET"),
@@ -81,7 +82,7 @@ def client():
 
 
 def test_las_paginas_redirigen_al_login_sin_sesion(client):
-    for path in ("/", "/historial"):
+    for path in ("/", "/historial", "/diagrama"):
         resp = client.get(path)
         assert resp.status_code == 302
         assert "/login" in resp.headers["Location"]
@@ -89,7 +90,8 @@ def test_las_paginas_redirigen_al_login_sin_sesion(client):
 
 def test_los_endpoints_privados_responden_401_sin_sesion(client):
     private = [rule for rule, _ in EXPECTED_ROUTES
-               if rule not in PUBLIC_ROUTES and rule not in ("/", "/historial")
+               if rule not in PUBLIC_ROUTES
+               and rule not in ("/", "/historial", "/diagrama")
                and "<" not in rule]
     assert private, "el test se quedaría vacío si cambian las rutas"
     for path in private:
@@ -107,6 +109,9 @@ def test_las_paginas_se_renderizan_con_sesion(client):
     assert "/static/css/dashboard.css" in html
     assert "/static/js/dashboard.js" in html
     assert client.get("/historial").status_code == 200
+    diagrama = client.get("/diagrama").get_data(as_text=True)
+    assert "/static/js/diagrama.js" in diagrama
+    assert 'class="tabbar"' in diagrama, "la barra de navegación debe estar"
 
 
 def test_el_login_se_renderiza_con_token_csrf(client):

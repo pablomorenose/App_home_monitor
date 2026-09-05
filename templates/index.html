@@ -14,6 +14,7 @@
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 
 <link rel="stylesheet" href="/static/css/dashboard.css">
+<link rel="stylesheet" href="/static/css/navbar.css">
 </head>
 <body>
 <div class="wrap">
@@ -117,6 +118,7 @@
     <div class="fg"><label>Intervalo de comprobación (seg)</label><input type="number" id="f-check-interval" value="60" min="10" max="3600"></div>
     <div class="fg"><label>Timeout (segundos)</label><input type="number" id="f-timeout" value="8" min="1" max="30"></div>
     <div class="fg"><label>Reintentos máximos</label><input type="number" id="f-max-retries" value="3" min="1" max="10"></div>
+    <div class="fg"><label>Depende de (para el diagrama)</label><select id="f-depends"><option value="">— Ninguna —</option></select></div>
     <div class="modal-actions">
       <button class="btn-cancel2" data-action="close-modal">Cancelar</button>
       <button class="btn-save" data-action="save-device">Guardar</button>
@@ -126,5 +128,19 @@
 
 
 <script src="/static/js/dashboard.js" defer></script>
+<nav class="tabbar">
+  <a href="/" data-tab="home" class="active">
+    <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h3.5v-6h5v6H18a1 1 0 0 0 1-1V9.5"/></svg>
+    Inicio
+  </a>
+  <a href="/diagrama" data-tab="diagrama">
+    <svg viewBox="0 0 24 24"><rect x="8.5" y="2.5" width="7" height="5" rx="1.5"/><rect x="2.5" y="16.5" width="7" height="5" rx="1.5"/><rect x="14.5" y="16.5" width="7" height="5" rx="1.5"/><path d="M12 7.5v4M12 11.5H6v5M12 11.5h6v5"/></svg>
+    Diagrama
+  </a>
+  <a href="/historial" data-tab="historial">
+    <svg viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4v4h4"/><path d="M12 7.5V12l3 2"/></svg>
+    Historial
+  </a>
+</nav>
 </body>
 </html>

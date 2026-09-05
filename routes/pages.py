@@ -14,6 +14,13 @@ def index():
     return render_template("index.html")
 
 
+@bp.route("/diagrama")
+def diagrama():
+    if require_auth():
+        return redirect(url_for("auth.login"))
+    return render_template("diagrama.html")
+
+
 @bp.route("/historial")
 def historial():
     if require_auth():
