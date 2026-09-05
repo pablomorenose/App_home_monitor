@@ -6,6 +6,7 @@
 
 const REFRESH_MS = 15000;
 const THEME_KEY = 'homem_theme';
+const OPEN_KEY = 'homem_diagrama_abiertos';   // qué tarjetas quedaron desplegadas
 const INDENT = 28;      // sangría por nivel (debe dejar sitio al codo y la flecha)
 const MAX_INDENT = 4;   // a partir de aquí no se sangra más (pantalla estrecha)
 
@@ -22,9 +23,31 @@ function applyTheme(t){
 }
 function toggleTheme(){
   applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-  requestAnimationFrame(drawWires);
+  drawWires();
 }
 try{ applyTheme(localStorage.getItem(THEME_KEY) || 'dark'); }catch{ applyTheme('dark'); }
+
+// ─── Plegado de tarjetas ───
+// Empiezan plegadas: con 11 monitores el árbol entero cabe de un vistazo, y
+// el detalle se abre a demanda. Lo que abras sobrevive al refresco de 15s.
+function loadOpen(){
+  try{ return new Set(JSON.parse(localStorage.getItem(OPEN_KEY)) || []); }
+  catch{ return new Set(); }
+}
+function saveOpen(set){
+  try{ localStorage.setItem(OPEN_KEY, JSON.stringify([...set])); }catch{}
+}
+function toggleNode(id){
+  const open = loadOpen();
+  open.has(id) ? open.delete(id) : open.add(id);
+  saveOpen(open);
+  const el = document.querySelector(`.node[data-id="${CSS.escape(id)}"]`);
+  if(el) el.classList.toggle('open', open.has(id));
+  // Al cambiar la altura de una caja los cables dejan de cuadrar. Se redibuja
+  // en el momento: drawWires mide con getBoundingClientRect, que ya fuerza el
+  // reflow, y un requestAnimationFrame no correría con la pestaña oculta.
+  drawWires();
+}
 
 // ─── Utilidades ───
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
@@ -93,19 +116,24 @@ function nodeHtml(d){
     `<span class="rule"></span><span class="v">${esc(v)}</span></div>`).join('');
 
   const cls = st === 'down' ? ' is-down' : st === 'degraded' ? ' is-degraded' : '';
-  return `<div class="node${cls}">
-    <div class="node-head">
+  const open = openIds.has(d.id) ? ' open' : '';
+  return `<div class="node${cls}${open}" data-id="${esc(d.id)}">
+    <div class="node-head" data-action="toggle-node" data-id="${esc(d.id)}"
+         role="button" tabindex="0" aria-expanded="${openIds.has(d.id)}">
       <span class="led ${st}"></span>
       <span class="node-name">${esc(d.name)}</span>
       <span class="node-kind">${esc(TYPE_LABEL[d.type] || d.type || '—')}</span>
+      <svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
     </div>
     <div class="node-body">${body}</div>
   </div>`;
 }
 
-let placed = [];   // {node, el, depth} para poder dibujar los cables
+let placed = [];       // {node, el, depth} para poder dibujar los cables
+let openIds = new Set();   // se relee en cada render para no perder el plegado
 
 function renderForest(roots){
+  openIds = loadOpen();
   const host = document.getElementById('nodes');
   host.innerHTML = '';
   placed = [];
@@ -209,7 +237,7 @@ async function refresh(){
     renderSummary(devices);
     renderForest(buildForest(devices));
     renderHint(devices);
-    requestAnimationFrame(drawWires);
+    drawWires();
   }catch{}
 }
 
@@ -218,6 +246,13 @@ document.addEventListener('click', e => {
   if(!el) return;
   if(el.dataset.action === 'toggle-theme') toggleTheme();
   if(el.dataset.action === 'reload') refresh();
+  if(el.dataset.action === 'toggle-node') toggleNode(el.dataset.id);
+});
+
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target.closest('[data-action="toggle-node"]');
+  if(el){ e.preventDefault(); toggleNode(el.dataset.id); }
 });
 
 let resizeTimer;

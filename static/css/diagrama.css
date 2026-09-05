@@ -32,8 +32,11 @@ body{
   font-family:var(--sans);
   -webkit-font-smoothing:antialiased;
   transition:background .25s;
+  /* viewport-fit=cover mete el contenido bajo la Dynamic Island: sin esto
+     el header queda tapado y sus botones no se pueden pulsar. */
+  padding-top:max(56px, calc(env(safe-area-inset-top) + 18px));
 }
-.wrap{max-width:640px;margin:0 auto;padding:20px 16px 8px;}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px 8px;}
 
 header{display:flex;align-items:flex-start;justify-content:space-between;
   gap:12px;margin-bottom:18px;}
@@ -84,7 +87,16 @@ h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin:2px 0 0;}
 .node-head{
   display:flex;align-items:center;gap:9px;
   padding:12px 14px;
+  cursor:pointer;user-select:none;-webkit-user-select:none;
 }
+.node-head:active{opacity:.65;}
+.chev{
+  width:15px;height:15px;flex-shrink:0;color:var(--text-dim);
+  fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;
+  transition:transform .18s ease;
+}
+.node.open .chev{transform:rotate(90deg);}
 .node-name{
   font-size:14.5px;font-weight:600;letter-spacing:-.01em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;
@@ -94,7 +106,9 @@ h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin:2px 0 0;}
   background:var(--chip-bg);border-radius:5px;padding:2px 6px;
   white-space:nowrap;
 }
-.node-body{
+/* Plegadas por defecto: así cabe el árbol entero en una pantalla. */
+.node-body{display:none;}
+.node.open .node-body{
   border-top:1px solid var(--node-ring);
   padding:9px 14px 11px;
   display:flex;flex-direction:column;gap:5px;
